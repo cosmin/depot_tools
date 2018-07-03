@@ -85,7 +85,7 @@ def UploadCl(refactor_branch, refactor_branch_upstream, directory, files,
   # Create a branch.
   if not CreateBranchForDirectory(
       refactor_branch, directory, refactor_branch_upstream):
-    print 'Skipping ' + directory + ' for which a branch already exists.'
+    print('Skipping ' + directory + ' for which a branch already exists.')
     return
 
   # Checkout all changes to files in |files|.
@@ -110,7 +110,7 @@ def UploadCl(refactor_branch, refactor_branch_upstream, directory, files,
   upload_args = ['-f', '--cq-dry-run', '-r', ','.join(reviewers)]
   if not comment:
     upload_args.append('--send-mail')
-  print 'Uploading CL for ' + directory + '.'
+  print('Uploading CL for ' + directory + '.')
   cmd_upload(upload_args)
   if comment:
     changelist().AddComment(FormatDescriptionOrComment(comment, directory),
@@ -148,12 +148,12 @@ def PrintClInfo(cl_index, num_cls, directory, file_paths, description,
                                                  directory).splitlines()
   indented_description = '\n'.join(['    ' + l for l in description_lines])
 
-  print 'CL {}/{}'.format(cl_index, num_cls)
-  print 'Path: {}'.format(directory)
-  print 'Reviewers: {}'.format(', '.join(reviewers))
-  print '\n' + indented_description + '\n'
-  print '\n'.join(file_paths)
-  print
+  print('CL {}/{}'.format(cl_index, num_cls))
+  print('Path: {}'.format(directory))
+  print('Reviewers: {}'.format(', '.join(reviewers)))
+  print('\n' + indented_description + '\n')
+  print('\n'.join(file_paths))
+  print()
 
 
 def SplitCl(description_file, comment_file, changelist, cmd_upload, dry_run):
@@ -180,7 +180,7 @@ def SplitCl(description_file, comment_file, changelist, cmd_upload, dry_run):
     files = change.AffectedFiles()
 
     if not files:
-      print 'Cannot split an empty CL.'
+      print('Cannot split an empty CL.')
       return 1
 
     author = git.run('config', 'user.email').strip() or None
@@ -196,11 +196,11 @@ def SplitCl(description_file, comment_file, changelist, cmd_upload, dry_run):
     files_split_by_owners = GetFilesSplitByOwners(owners_database, files)
 
     num_cls = len(files_split_by_owners)
-    print('Will split current branch (' + refactor_branch + ') into ' +
-          str(num_cls) + ' CLs.\n')
+    print(('Will split current branch (' + refactor_branch + ') into ' +
+          str(num_cls) + ' CLs.\n'))
 
     for cl_index, (directory, files) in \
-        enumerate(files_split_by_owners.iteritems(), 1):
+        enumerate(iter(files_split_by_owners.items()), 1):
       # Use '/' as a path separator in the branch name and the CL description
       # and comment.
       directory = directory.replace(os.path.sep, '/')

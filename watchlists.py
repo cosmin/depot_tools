@@ -60,7 +60,7 @@ class Watchlists(object):
       contents = watchlists_file.read()
       watchlists_file.close()
       return contents
-    except IOError, e:
+    except IOError as e:
       logging.error("Cannot read %s: %s" % (self._GetRulesFilePath(), e))
       return ''
 
@@ -73,7 +73,7 @@ class Watchlists(object):
     watchlists_data = None
     try:
       watchlists_data = eval(contents, {'__builtins__': None}, None)
-    except SyntaxError, e:
+    except SyntaxError as e:
       logging.error("Cannot parse %s. %s" % (self._GetRulesFilePath(), e))
       return
 
@@ -92,7 +92,7 @@ class Watchlists(object):
     # Compile the regular expressions ahead of time to avoid creating them
     # on-the-fly multiple times per file.
     self._path_regexps = {}
-    for name, rule in defns.iteritems():
+    for name, rule in defns.items():
       filepath = rule.get('filepath')
       if not filepath:
         continue
@@ -115,23 +115,23 @@ class Watchlists(object):
     watchers = set()  # A set, to avoid duplicates
     for path in paths:
       path = path.replace(os.sep, '/')
-      for name, rule in self._path_regexps.iteritems():
+      for name, rule in self._path_regexps.items():
         if name not in self._watchlists:
           continue
         if rule.search(path):
-          map(watchers.add, self._watchlists[name])
+          list(map(watchers.add, self._watchlists[name]))
     return list(watchers)
 
 
 def main(argv):
   # Confirm that watchlists can be parsed and spew out the watchers
   if len(argv) < 2:
-    print "Usage (from the base of repo):"
-    print "  %s [file-1] [file-2] ...." % argv[0]
+    print("Usage (from the base of repo):")
+    print("  %s [file-1] [file-2] ...." % argv[0])
     return 1
   wl = Watchlists(os.getcwd())
   watchers = wl.GetWatchersForPaths(argv[1:])
-  print watchers
+  print(watchers)
 
 
 if __name__ == '__main__':

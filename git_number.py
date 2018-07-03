@@ -75,7 +75,7 @@ def get_number_tree(prefix_bytes):
   try:
     raw = buffer(git.run('cat-file', 'blob', ref, autostrip=False))
     return dict(struct.unpack_from(CHUNK_FMT, raw, i * CHUNK_SIZE)
-                for i in xrange(len(raw) / CHUNK_SIZE))
+                for i in range(len(raw) / CHUNK_SIZE))
   except subprocess2.CalledProcessError:
     return {}
 
@@ -109,14 +109,15 @@ def intern_number_tree(tree):
   'c552317aa95ca8c3f6aae3357a4be299fbcb25ce'
   """
   with tempfile.TemporaryFile() as f:
-    for k, v in sorted(tree.iteritems()):
+    for k, v in sorted(tree.items()):
       f.write(struct.pack(CHUNK_FMT, k, v))
     f.seek(0)
     return git.intern_f(f)
 
 
-def leaf_map_fn((pre, tree)):
+def leaf_map_fn(xxx_todo_changeme):
   """Converts a prefix and number tree into a git index line."""
+  (pre, tree) = xxx_todo_changeme
   return '100644 blob %s\t%s\0' % (intern_number_tree(tree), pathlify(pre))
 
 
@@ -131,7 +132,7 @@ def finalize(targets):
   if not DIRTY_TREES:
     return
 
-  msg = 'git-number Added %s numbers' % sum(DIRTY_TREES.itervalues())
+  msg = 'git-number Added %s numbers' % sum(DIRTY_TREES.values())
 
   idx = os.path.join(git.run('rev-parse', '--git-dir'), 'number.idx')
   env = os.environ.copy()
@@ -177,7 +178,7 @@ def preload_tree(prefix):
 
 
 def all_prefixes(depth=PREFIX_LEN):
-  for x in (chr(i) for i in xrange(255)):
+  for x in (chr(i) for i in range(255)):
     # This isn't covered because PREFIX_LEN currently == 1
     if depth > 1:  # pragma: no cover
       for r in all_prefixes(depth - 1):
@@ -225,9 +226,9 @@ def load_generation_numbers(targets):
       # stdout as they're produced). GIL strikes again :/
       cmd = [
         'rev-list', '--topo-order', '--parents', '--reverse', '^' + REF,
-      ] + map(binascii.hexlify, targets)
+      ] + list(map(binascii.hexlify, targets))
       for line in git.run(*cmd).splitlines():
-        tokens = map(binascii.unhexlify, line.split())
+        tokens = list(map(binascii.unhexlify, line.split()))
         rev_list.append((tokens[0], tokens[1:]))
         inc()
 
@@ -235,7 +236,7 @@ def load_generation_numbers(targets):
 
   with git.ProgressPrinter('Counting: %%(count)d/%d' % len(rev_list)) as inc:
     for commit_hash, pars in rev_list:
-      num = max(map(get_num, pars)) + 1 if pars else 0
+      num = max(list(map(get_num, pars))) + 1 if pars else 0
 
       prefix = commit_hash[:PREFIX_LEN]
       get_number_tree(prefix)[commit_hash] = num
@@ -278,7 +279,7 @@ def main():  # pragma: no cover
   if not opts.no_cache:
     finalize(targets)
 
-  print '\n'.join(map(str, map(get_num, targets)))
+  print('\n'.join(map(str, list(map(get_num, targets)))))
   return 0
 
 

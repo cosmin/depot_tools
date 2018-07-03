@@ -6,7 +6,7 @@
 """Wrapper around git blame that ignores certain commits.
 """
 
-from __future__ import print_function
+
 
 import argparse
 import collections

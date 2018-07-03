@@ -102,20 +102,20 @@ def get_available_tools():
 
 def usage():
   infra_tools, cipd_tools = get_available_tools()
-  print """usage: cit.py <name of tool> [args for tool]
+  print("""usage: cit.py <name of tool> [args for tool]
 
   Wrapper for maintaining and calling tools in:
     "infra.git/run.py infra.tools.*"
     "infra.git/cipd/*"
 
-  Available infra tools are:"""
+  Available infra tools are:""")
   for tool in infra_tools:
-    print '  * %s' % tool
+    print('  * %s' % tool)
 
-  print """
-  Available cipd tools are:"""
+  print("""
+  Available cipd tools are:""")
   for tool in cipd_tools:
-    print '  * %s' % tool
+    print('  * %s' % tool)
 
 
 def run(args):
@@ -137,7 +137,7 @@ def run(args):
   elif os.path.isfile(cipd_file) and is_exe(cipd_file):
     cmd = [cipd_file]
   else:
-    print >>sys.stderr, 'Unknown tool "%s"' % tool_name
+    print('Unknown tool "%s"' % tool_name, file=sys.stderr)
     return usage()
 
   # Add the remaining arguments.

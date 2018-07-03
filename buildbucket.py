@@ -17,7 +17,7 @@ Usage:
 
 import argparse
 import json
-import urlparse
+import urllib.parse
 import os
 import sys
 
@@ -27,7 +27,7 @@ import auth
 
 
 BUILDBUCKET_URL = 'https://cr-buildbucket.appspot.com'
-BUILDBUCKET_API_URL = urlparse.urljoin(
+BUILDBUCKET_API_URL = urllib.parse.urljoin(
   BUILDBUCKET_URL,
   '_ah/api/buildbucket/v1/builds',
 )
@@ -124,7 +124,7 @@ def main(argv):
   )
 
   if args.verbose:
-    print content
+    print(content)
 
   return response.status != 200
 

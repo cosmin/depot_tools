@@ -7,11 +7,11 @@
 In theory you shouldn't need anything else in subprocess, or this module failed.
 """
 
-import cStringIO
+import io
 import errno
 import logging
 import os
-import Queue
+import queue
 import subprocess
 import sys
 import time
@@ -44,7 +44,7 @@ class CalledProcessError(subprocess.CalledProcessError):
         ' '.join(self.cmd), self.returncode)
     if self.cwd:
       out += ' in ' + self.cwd
-    return '\n'.join(filter(None, (out, self.stdout, self.stderr)))
+    return '\n'.join([_f for _f in (out, self.stdout, self.stderr) if _f])
 
 
 class CygwinRebaseError(CalledProcessError):
@@ -204,7 +204,7 @@ class Popen(subprocess.Popen):
       # the list.
       kwargs['shell'] = bool(sys.platform=='win32')
 
-    if isinstance(args, basestring):
+    if isinstance(args, str):
       tmp_str = args
     elif isinstance(args, (list, tuple)):
       tmp_str = ' '.join(args)
@@ -244,7 +244,7 @@ class Popen(subprocess.Popen):
     try:
       with self.popen_lock:
         super(Popen, self).__init__(args, **kwargs)
-    except OSError, e:
+    except OSError as e:
       if e.errno == errno.EAGAIN and sys.platform == 'cygwin':
         # Convert fork() emulation failure into a CygwinRebaseError().
         raise CygwinRebaseError(
@@ -275,13 +275,13 @@ class Popen(subprocess.Popen):
     # processing on OSX10.6 by a factor of 2x, making it even slower than
     # Windows!  Revisit this decision if it becomes a problem, e.g. crash
     # because of memory exhaustion.
-    queue = Queue.Queue()
+    queue = queue.Queue()
     done = threading.Event()
     nag = None
 
     def write_stdin():
       try:
-        stdin_io = cStringIO.StringIO(input)
+        stdin_io = io.StringIO(input)
         while True:
           data = stdin_io.read(1024)
           if data:
@@ -339,7 +339,7 @@ class Popen(subprocess.Popen):
     elif self.stdin:
       # Pipe but no input, make sure it's closed.
       self.stdin.close()
-    for t in threads.itervalues():
+    for t in threads.values():
       t.start()
 
     if self.nag_timer:
@@ -386,7 +386,7 @@ class Popen(subprocess.Popen):
         logging.debug('Killing child because of an exception')
         self.kill()
       # Join threads.
-      for thread in threads.itervalues():
+      for thread in threads.values():
         thread.join()
       if timed_out:
         self.returncode = TIMED_OUT
@@ -447,7 +447,7 @@ def communicate(args, timeout=None, nag_timer=None, nag_max=None, **kwargs):
   """
   stdin = kwargs.pop('stdin', None)
   if stdin is not None:
-    if isinstance(stdin, basestring):
+    if isinstance(stdin, str):
       # When stdin is passed as an argument, use it as the actual input data and
       # set the Popen() parameter accordingly.
       kwargs['stdin'] = PIPE

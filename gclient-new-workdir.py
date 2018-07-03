@@ -93,11 +93,11 @@ def main():
   for root, dirs, _ in os.walk(args.repository):
     if '.git' in dirs:
       workdir = root.replace(args.repository, args.new_workdir, 1)
-      print('Creating: %s' % workdir)
+      print(('Creating: %s' % workdir))
 
       if args.reflink:
         if not os.path.exists(workdir):
-          print('Copying: %s' % workdir)
+          print(('Copying: %s' % workdir))
           subprocess.check_call(['cp', '-a', '--reflink', root, workdir])
         shutil.rmtree(os.path.join(workdir, '.git'))
 
@@ -111,12 +111,12 @@ def main():
         subprocess.check_call(['git', 'checkout', '-f'], cwd=workdir)
 
   if args.reflink:
-    print(textwrap.dedent('''\
+    print((textwrap.dedent('''\
       The repo was copied with copy-on-write, and the artifacts were retained.
       More details on http://crbug.com/721585.
 
       Depending on your usage pattern, you might want to do "gn gen"
-      on the output directories. More details: http://crbug.com/723856.'''))
+      on the output directories. More details: http://crbug.com/723856.''')))
 
 if __name__ == '__main__':
   sys.exit(main())

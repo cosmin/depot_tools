@@ -9,7 +9,7 @@
 import hashlib
 import optparse
 import os
-import Queue
+import queue
 import re
 import shutil
 import stat
@@ -122,7 +122,7 @@ class Gsutil(object):
 
   def check_call_with_retries(self, *args):
     delay = self.RETRY_BASE_DELAY
-    for i in xrange(self.MAX_TRIES):
+    for i in range(self.MAX_TRIES):
       code, out, err = self.check_call(*args)
       if not code or i == self.MAX_TRIES - 1:
         break
@@ -164,7 +164,7 @@ def enumerate_input(input_filename, directory, recursive, ignore_errors, output,
     if not os.path.exists(input_filename):
       if not ignore_errors:
         raise FileNotFoundError('%s not found.' % input_filename)
-      print >> sys.stderr, '%s not found.' % input_filename
+      print('%s not found.' % input_filename, file=sys.stderr)
     with open(input_filename, 'rb') as f:
       sha1_match = re.match('^([A-Za-z0-9]{40})$', f.read(1024).rstrip())
       if sha1_match:
@@ -172,7 +172,7 @@ def enumerate_input(input_filename, directory, recursive, ignore_errors, output,
         return
     if not ignore_errors:
       raise InvalidFileError('No sha1 sum found in %s.' % input_filename)
-    print >> sys.stderr, 'No sha1 sum found in %s.' % input_filename
+    print('No sha1 sum found in %s.' % input_filename, file=sys.stderr)
     return
 
   if not directory:
@@ -198,7 +198,7 @@ def enumerate_input(input_filename, directory, recursive, ignore_errors, output,
                    'the path of %s' % full_path)
             if not ignore_errors:
               raise InvalidFileError(err)
-            print >> sys.stderr, err
+            print(err, file=sys.stderr)
             continue
           current_platform = PLATFORM_MAPPING[sys.platform]
           if current_platform != target_platform:
@@ -211,7 +211,7 @@ def enumerate_input(input_filename, directory, recursive, ignore_errors, output,
         else:
           if not ignore_errors:
             raise InvalidFileError('No sha1 sum found in %s.' % filename)
-          print >> sys.stderr, 'No sha1 sum found in %s.' % filename
+          print('No sha1 sum found in %s.' % filename, file=sys.stderr)
 
 
 def _validate_tar_file(tar, prefix):
@@ -348,7 +348,7 @@ class PrinterThread(threading.Thread):
       if line is None:
         break
       self.did_print_anything = True
-      print line
+      print(line)
 
 
 def _data_exists(input_sha1_sum, output_filename, extract):
@@ -405,9 +405,9 @@ def download_from_google_storage(
   # Start up all the worker threads.
   all_threads = []
   download_start = time.time()
-  stdout_queue = Queue.Queue()
-  work_queue = Queue.Queue()
-  ret_codes = Queue.Queue()
+  stdout_queue = queue.Queue()
+  work_queue = queue.Queue()
+  ret_codes = queue.Queue()
   ret_codes.put((0, None))
   for thread_num in range(num_threads):
     t = threading.Thread(
@@ -438,12 +438,12 @@ def download_from_google_storage(
   for ret_code, message in ret_codes.queue:
     max_ret_code = max(ret_code, max_ret_code)
     if message:
-      print >> sys.stderr, message
+      print(message, file=sys.stderr)
 
   # Only print summary if any work was done.
   if printer_thread.did_print_anything:
-    print 'Downloading %d files took %1f second(s)' % (
-        len(input_data), time.time() - download_start)
+    print('Downloading %d files took %1f second(s)' % (
+        len(input_data), time.time() - download_start))
   return max_ret_code
 
 
@@ -521,8 +521,8 @@ def main(args):
       parser.error('--platform can not be specified with --auto_platform')
     if not re.match(options.platform, GetNormalizedPlatform()):
       if options.verbose:
-        print('The current platform doesn\'t match "%s", skipping.' %
-              options.platform)
+        print(('The current platform doesn\'t match "%s", skipping.' %
+              options.platform))
       return 0
 
   # Set the boto file to /dev/null if we don't need auth.
@@ -530,14 +530,14 @@ def main(args):
     if (set(('http_proxy', 'https_proxy')).intersection(
         env.lower() for env in os.environ) and
         'NO_AUTH_BOTO_CONFIG' not in os.environ):
-      print >> sys.stderr, ('NOTICE: You have PROXY values set in your '
+      print(('NOTICE: You have PROXY values set in your '
                             'environment, but gsutil in depot_tools does not '
-                            '(yet) obey them.')
-      print >> sys.stderr, ('Also, --no_auth prevents the normal BOTO_CONFIG '
-                            'environment variable from being used.')
-      print >> sys.stderr, ('To use a proxy in this situation, please supply '
+                            '(yet) obey them.'), file=sys.stderr)
+      print(('Also, --no_auth prevents the normal BOTO_CONFIG '
+                            'environment variable from being used.'), file=sys.stderr)
+      print(('To use a proxy in this situation, please supply '
                             'those settings in a .boto file pointed to by '
-                            'the NO_AUTH_BOTO_CONFIG environment var.')
+                            'the NO_AUTH_BOTO_CONFIG environment var.'), file=sys.stderr)
     options.boto = os.environ.get('NO_AUTH_BOTO_CONFIG', os.devnull)
 
   # Make sure gsutil exists where we expect it to.
@@ -550,10 +550,10 @@ def main(args):
 
   # Passing in -g/--config will run our copy of GSUtil, then quit.
   if options.config:
-    print '===Note from depot_tools==='
-    print 'If you do not have a project ID, enter "0" when asked for one.'
-    print '===End note from depot_tools==='
-    print
+    print('===Note from depot_tools===')
+    print('If you do not have a project ID, enter "0" when asked for one.')
+    print('===End note from depot_tools===')
+    print()
     gsutil.check_call('version')
     return gsutil.call('config')
 

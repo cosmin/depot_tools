@@ -8,7 +8,7 @@
 import hashlib
 import optparse
 import os
-import Queue
+import queue
 import re
 import stat
 import sys
@@ -140,11 +140,11 @@ def upload_to_google_storage(
 
   # Start up all the worker threads plus the printer thread.
   all_threads = []
-  ret_codes = Queue.Queue()
+  ret_codes = queue.Queue()
   ret_codes.put((0, None))
-  upload_queue = Queue.Queue()
+  upload_queue = queue.Queue()
   upload_timer = time.time()
-  stdout_queue = Queue.Queue()
+  stdout_queue = queue.Queue()
   printer_thread = PrinterThread(stdout_queue)
   printer_thread.daemon = True
   printer_thread.start()
@@ -170,7 +170,7 @@ def upload_to_google_storage(
       with open(filename + '.sha1', 'rb') as f:
         sha1_file = f.read(1024)
       if not re.match('^([a-z0-9]{40})$', sha1_file):
-        print >> sys.stderr, 'Invalid sha1 hash file %s.sha1' % filename
+        print('Invalid sha1 hash file %s.sha1' % filename, file=sys.stderr)
         return 1
       upload_queue.put((filename, sha1_file))
       continue
@@ -191,19 +191,19 @@ def upload_to_google_storage(
   printer_thread.join()
 
   # Print timing information.
-  print 'Hashing %s files took %1f seconds' % (
-      len(input_filenames), hashing_duration)
-  print 'Uploading took %1f seconds' % (time.time() - upload_timer)
+  print('Hashing %s files took %1f seconds' % (
+      len(input_filenames), hashing_duration))
+  print('Uploading took %1f seconds' % (time.time() - upload_timer))
 
   # See if we ran into any errors.
   max_ret_code = 0
   for ret_code, message in ret_codes.queue:
     max_ret_code = max(ret_code, max_ret_code)
     if message:
-      print >> sys.stderr, message
+      print(message, file=sys.stderr)
 
   if not max_ret_code:
-    print 'Success!'
+    print('Success!')
 
   return max_ret_code
 
@@ -220,17 +220,17 @@ def create_archives(dirs):
 
 def validate_archive_dirs(dirs):
   # We don't allow .. in paths in our archives.
-  if any(map(lambda x: '..' in x, dirs)):
+  if any(['..' in x for x in dirs]):
     return False
   # We only allow dirs.
-  if any(map(lambda x: not os.path.isdir(x), dirs)):
+  if any([not os.path.isdir(x) for x in dirs]):
     return False
   # We don't allow sym links in our archives.
   if any(map(os.path.islink, dirs)):
     return False
   # We required that the subdirectories we are archiving are all just below
   # cwd.
-  return not any(map(lambda x: x not in next(os.walk('.'))[1], dirs))
+  return not any([x not in next(os.walk('.'))[1] for x in dirs])
 
 
 def main():

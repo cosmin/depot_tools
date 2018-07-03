@@ -51,7 +51,7 @@ def print_help():
   msg = "usage: git map [-h] [<args>]\n"
 
   for line in __doc__.splitlines():
-    for key in names.keys():
+    for key in list(names.keys()):
       if key in line:
         msg += line.replace('* ', '* ' + names[key])+RESET+'\n'
         break
@@ -77,16 +77,16 @@ def main(argv):
   current = current_branch()
   all_branches = set(branches())
   merge_base_map = {b: get_or_create_merge_base(b) for b in all_branches}
-  merge_base_map = {b: v for b, v in merge_base_map.iteritems() if v}
+  merge_base_map = {b: v for b, v in merge_base_map.items() if v}
   if current in all_branches:
     all_branches.remove(current)
   all_tags = set(tags())
   try:
-    for line in log_proc.stdout.xreadlines():
+    for line in log_proc.stdout:
       if merge_base_map:
         commit = line[line.find(BRIGHT_RED)+len(BRIGHT_RED):line.find('\t')]
         base_for_branches = set()
-        for branch, sha in merge_base_map.iteritems():
+        for branch, sha in merge_base_map.items():
           if sha.startswith(commit):
             base_for_branches.add(branch)
         if base_for_branches:

@@ -47,7 +47,7 @@ def main():
   abs_build_dir = os.path.join(src_dir, options.build_dir)
   src_relpath = os.path.relpath(options.file_path, abs_build_dir)
 
-  print 'Building %s' % options.file_path
+  print('Building %s' % options.file_path)
 
   ninja_exec = 'ninja'
   carets = '^'

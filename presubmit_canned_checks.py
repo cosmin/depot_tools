@@ -712,7 +712,7 @@ def GetPylint(input_api, output_api, white_list=None, black_list=None,
         input_api.PresubmitLocalPath(), input_api.change.RepositoryRoot()), '')
     return input_api.re.escape(prefix) + regex
   src_filter = lambda x: input_api.FilterSourceFile(
-      x, map(rel_path, white_list), map(rel_path, black_list))
+      x, list(map(rel_path, white_list)), list(map(rel_path, black_list)))
   if not input_api.AffectedSourceFiles(src_filter):
     input_api.logging.info('Skipping pylint: no matching changes.')
     return []
@@ -786,7 +786,7 @@ def GetPylint(input_api, output_api, white_list=None, black_list=None,
       return [ GetPylintCmd(files, [], True) ]
 
   else:
-    return map(lambda x: GetPylintCmd([x], [], 1), files)
+    return [GetPylintCmd([x], [], 1) for x in files]
 
 
 def RunPylint(input_api, *args, **kwargs):
@@ -814,7 +814,7 @@ def CheckBuildbotPendingBuilds(input_api, output_api, url, max_pendings,
                                              'looking up buildbot status')]
 
   out = []
-  for (builder_name, builder) in data.iteritems():
+  for (builder_name, builder) in data.items():
     if builder_name in ignored:
       continue
     if builder.get('state', '') == 'offline':
@@ -986,7 +986,7 @@ def PanProjectChecks(input_api, output_api,
   # 2006-20xx string used on the oldest files. 2006-20xx is deprecated, but
   # tolerated on old files.
   current_year = int(input_api.time.strftime('%Y'))
-  allowed_years = (str(s) for s in reversed(xrange(2006, current_year + 1)))
+  allowed_years = (str(s) for s in reversed(range(2006, current_year + 1)))
   years_re = '(' + '|'.join(allowed_years) + '|2006-2008|2006-2009|2006-2010)'
 
   # The (c) is deprecated, but tolerate it until it's removed from all files.
@@ -1019,7 +1019,7 @@ def PanProjectChecks(input_api, output_api,
     if snapshot_memory:
       delta_ms = int(1000*(dt2 - snapshot_memory[0]))
       if delta_ms > 500:
-        print "  %s took a long time: %dms" % (snapshot_memory[1], delta_ms)
+        print("  %s took a long time: %dms" % (snapshot_memory[1], delta_ms))
     snapshot_memory[:] = (dt2, msg)
 
   snapshot("checking owners files format")
@@ -1176,7 +1176,7 @@ def CheckCIPDPackages(input_api, output_api, platforms, packages):
   manifest = []
   for p in platforms:
     manifest.append('$VerifiedPlatform %s' % (p,))
-  for k, v in packages.iteritems():
+  for k, v in packages.items():
     manifest.append('%s %s' % (k, v))
   return CheckCIPDManifest(input_api, output_api, content='\n'.join(manifest))
 
@@ -1197,7 +1197,7 @@ def CheckVPythonSpec(input_api, output_api, file_filter=None):
   """
   file_filter = file_filter or (lambda f: f.LocalPath().endswith('.vpython'))
   affected_files = input_api.AffectedTestableFiles(file_filter=file_filter)
-  affected_files = map(lambda f: f.AbsoluteLocalPath(), affected_files)
+  affected_files = [f.AbsoluteLocalPath() for f in affected_files]
 
   commands = []
   for f in affected_files:
@@ -1215,7 +1215,7 @@ def CheckChangedLUCIConfigs(input_api, output_api):
   import base64
   import json
   import logging
-  import urllib2
+  import urllib.request, urllib.error, urllib.parse
 
   import auth
   import git_cl
@@ -1254,16 +1254,16 @@ def CheckChangedLUCIConfigs(input_api, output_api):
   def request(endpoint, body=None):
     api_url = ('https://%s/_ah/api/config/v1/%s'
                % (LUCI_CONFIG_HOST_NAME, endpoint))
-    req = urllib2.Request(api_url)
+    req = urllib.request.Request(api_url)
     req.add_header('Authorization', 'Bearer %s' % acc_tkn.token)
     if body is not None:
       req.add_header('Content-Type', 'application/json')
       req.add_data(json.dumps(body))
-    return json.load(urllib2.urlopen(req))
+    return json.load(urllib.request.urlopen(req))
 
   try:
     config_sets = request('config-sets').get('config_sets')
-  except urllib2.HTTPError as e:
+  except urllib.error.HTTPError as e:
     return [output_api.PresubmitError(
         'Config set request to luci-config failed', long_text=str(e))]
   if not config_sets:
@@ -1281,7 +1281,7 @@ def CheckChangedLUCIConfigs(input_api, output_api):
     # windows
     file_path = f.LocalPath().replace(_os.sep, '/')
     logging.debug('Affected file path: %s', file_path)
-    for dr, cs in dir_to_config_set.iteritems():
+    for dr, cs in dir_to_config_set.items():
       if dr == '/' or file_path.startswith(dr):
         cs_to_files[cs].append({
           'path': file_path[len(dr):] if dr != '/' else file_path,
@@ -1289,12 +1289,12 @@ def CheckChangedLUCIConfigs(input_api, output_api):
               '\n'.join(f.NewContents()).encode('utf-8'))
         })
   outputs = []
-  for cs, f in cs_to_files.iteritems():
+  for cs, f in cs_to_files.items():
     try:
       # TODO(myjang): parallelize
       res = request(
           'validate-config', body={'config_set': cs, 'files': f})
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
       return [output_api.PresubmitError(
           'Validation request to luci-config failed', long_text=str(e))]
     for msg in res.get('messages', []):

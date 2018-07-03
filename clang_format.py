@@ -63,7 +63,7 @@ def main(args):
   # redirection can be a little opaque.
   help_syntax = ('-h', '--help', '-help', '-help-list', '--help-list')
   if any(match in args for match in help_syntax):
-    print '\nDepot tools redirects you to the clang-format at:\n    %s\n' % tool
+    print('\nDepot tools redirects you to the clang-format at:\n    %s\n' % tool)
 
   return subprocess.call([tool] + args)
 

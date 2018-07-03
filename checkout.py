@@ -20,7 +20,7 @@ import tempfile
 try:
   import configparser
 except ImportError:
-  import ConfigParser as configparser
+  import configparser as configparser
 
 import patch
 import scm
@@ -233,7 +233,7 @@ class GitCheckout(CheckoutBase):
 
   def _get_head_commit_hash(self):
     """Gets the current revision (in unicode) from the local branch."""
-    return unicode(self._check_output_git(['rev-parse', 'HEAD']).strip())
+    return str(self._check_output_git(['rev-parse', 'HEAD']).strip())
 
   def apply_patch(self, patches, post_processors=None, verbose=False):
     """Applies a patch on 'working_branch' and switches to it.
@@ -288,11 +288,11 @@ class GitCheckout(CheckoutBase):
         for post in post_processors:
           post(self, p)
         if verbose:
-          print p.filename
-          print align_stdout(stdout)
-      except OSError, e:
+          print(p.filename)
+          print(align_stdout(stdout))
+      except OSError as e:
         errors.append((p, '%s%s' % (align_stdout(stdout), e)))
-      except subprocess.CalledProcessError, e:
+      except subprocess.CalledProcessError as e:
         errors.append((p,
             'While running %s;\n%s%s' % (
               ' '.join(e.cmd),
@@ -307,9 +307,9 @@ class GitCheckout(CheckoutBase):
       extra_files = sorted(set(found_files) - set(patches.filenames))
       unpatched_files = sorted(set(patches.filenames) - set(found_files))
       if extra_files:
-        print 'Found extra files: %r' % (extra_files,)
+        print('Found extra files: %r' % (extra_files,))
       if unpatched_files:
-        print 'Found unpatched files: %r' % (unpatched_files,)
+        print('Found unpatched files: %r' % (unpatched_files,))
 
 
   def commit(self, commit_message, user):
@@ -317,7 +317,7 @@ class GitCheckout(CheckoutBase):
     # TODO(hinoka): CQ no longer uses this, I think its deprecated.
     #               Delete this.
     assert self.commit_user
-    assert isinstance(commit_message, unicode)
+    assert isinstance(commit_message, str)
     current_branch = self._check_output_git(
         ['rev-parse', '--abbrev-ref', 'HEAD']).strip()
     assert current_branch == self.working_branch

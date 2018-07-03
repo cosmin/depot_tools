@@ -4,7 +4,7 @@
 
 """Gclient-specific SCM-specific operations."""
 
-from __future__ import print_function
+
 
 import collections
 import contextlib
@@ -18,7 +18,7 @@ import sys
 import tempfile
 import threading
 import traceback
-import urlparse
+import urllib.parse
 
 import download_from_google_storage
 import gclient_utils
@@ -253,7 +253,7 @@ class GitWrapper(SCMWrapper):
     """Returns the names of files modified since base."""
     return self._Capture(
       # Filter to remove base if it is None.
-      filter(bool, ['-c', 'core.quotePath=false', 'diff', '--name-only', base])
+      list(filter(bool, ['-c', 'core.quotePath=false', 'diff', '--name-only', base]))
     ).split()
 
   def diff(self, options, _args, _file_list):
@@ -960,7 +960,7 @@ class GitWrapper(SCMWrapper):
                                 "gclient with --jobs=1 so that\n"
                                 "interaction is possible.")
     try:
-      return raw_input(prompt)
+      return input(prompt)
     except KeyboardInterrupt:
       # Hide the exception.
       sys.exit(1)
@@ -1001,7 +1001,7 @@ class GitWrapper(SCMWrapper):
 
     try:
       rebase_output = scm.GIT.Capture(rebase_cmd, cwd=self.checkout_path)
-    except subprocess2.CalledProcessError, e:
+    except subprocess2.CalledProcessError as e:
       if (re.match(r'cannot rebase: you have unstaged changes', e.stderr) or
           re.match(r'cannot rebase: your index contains uncommitted changes',
                    e.stderr)):
@@ -1324,7 +1324,7 @@ class CipdRoot(object):
       ensure_file = None
       with tempfile.NamedTemporaryFile(
           suffix='.ensure', delete=False) as ensure_file:
-        for subdir, packages in sorted(self._packages_by_subdir.iteritems()):
+        for subdir, packages in sorted(self._packages_by_subdir.items()):
           ensure_file.write('@Subdir %s\n' % subdir)
           for package in sorted(packages, key=lambda p: p.name):
             ensure_file.write('%s %s\n' % (package.name, package.version))

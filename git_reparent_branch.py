@@ -54,7 +54,7 @@ def main(args):
       "`git branch --set-upstream-to` to assign it one.\n\nPlease assign an "
       "upstream branch and then run this command again."
     )
-    print >> sys.stderr, msg % branch
+    print(msg % branch, file=sys.stderr)
     return 1
 
   mbase = get_or_create_merge_base(branch, cur_parent)
@@ -66,17 +66,17 @@ def main(args):
   try:
     run('show-ref', new_parent)
   except subprocess2.CalledProcessError:
-    print >> sys.stderr, 'fatal: invalid reference: %s' % new_parent
+    print('fatal: invalid reference: %s' % new_parent, file=sys.stderr)
     return 1
 
   if new_parent in all_tags:
-    print ("Reparenting %s to track %s [tag] (was %s)"
-           % (branch, new_parent, cur_parent))
+    print(("Reparenting %s to track %s [tag] (was %s)"
+           % (branch, new_parent, cur_parent)))
     set_branch_config(branch, 'remote', '.')
     set_branch_config(branch, 'merge', new_parent)
   else:
-    print ("Reparenting %s to track %s (was %s)"
-           % (branch, new_parent, cur_parent))
+    print(("Reparenting %s to track %s (was %s)"
+           % (branch, new_parent, cur_parent)))
     run('branch', '--set-upstream-to', new_parent, branch)
 
   manual_merge_base(branch, mbase, new_parent)

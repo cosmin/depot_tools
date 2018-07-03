@@ -54,13 +54,13 @@ def main(args):
   # inside of buildtools.
   bin_path = gclient_utils.GetBuildtoolsPlatformBinaryPath()
   if not bin_path:
-    print >> sys.stderr, ('gn.py: Could not find checkout in any parent of '
+    print(('gn.py: Could not find checkout in any parent of '
                           'the current path.\nThis must be run inside a '
-                          'checkout.')
+                          'checkout.'), file=sys.stderr)
     return 1
   gn_path = os.path.join(bin_path, 'gn' + gclient_utils.GetExeSuffix())
   if not os.path.exists(gn_path):
-    print >> sys.stderr, 'gn.py: Could not find gn executable at: %s' % gn_path
+    print('gn.py: Could not find gn executable at: %s' % gn_path, file=sys.stderr)
     return 2
   else:
     return subprocess.call([gn_path] + args[1:])

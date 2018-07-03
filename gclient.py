@@ -80,7 +80,7 @@
 #   To specify a target CPU, the variables target_cpu and target_cpu_only
 #   are available and are analagous to target_os and target_os_only.
 
-from __future__ import print_function
+
 
 __version__ = '0.7'
 
@@ -96,7 +96,7 @@ import pprint
 import re
 import sys
 import time
-import urlparse
+import urllib.parse
 
 import detect_host_arch
 import fix_encoding
@@ -125,14 +125,14 @@ def ToGNString(value, allow_dicts = True):
   allow_dicts indicates if this function will allow converting dictionaries
   to GN scopes. This is only possible at the top level, you can't nest a
   GN scope in a list, so this should be set to False for recursive calls."""
-  if isinstance(value, basestring):
+  if isinstance(value, str):
     if value.find('\n') >= 0:
       raise GNException("Trying to print a string with a newline in it.")
     return '"' + \
         value.replace('\\', '\\\\').replace('"', '\\"').replace('$', '\\$') + \
         '"'
 
-  if isinstance(value, unicode):
+  if isinstance(value, str):
     return ToGNString(value.encode('utf-8'))
 
   if isinstance(value, bool):
@@ -276,7 +276,7 @@ class DependencySettings(object):
     self._custom_hooks = custom_hooks or []
 
     # Post process the url to remove trailing slashes.
-    if isinstance(self.url, basestring):
+    if isinstance(self.url, str):
       # urls are sometime incorrectly written as proto://host/path/@rev. Replace
       # it to proto://host/path@rev.
       self.set_url(self.url.replace('/@', '@'))
@@ -418,7 +418,7 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
 
     self._OverrideUrl()
     # This is inherited from WorkItem.  We want the URL to be a resource.
-    if self.url and isinstance(self.url, basestring):
+    if self.url and isinstance(self.url, str):
       # The url is usually given to gclient either as https://blah@123
       # or just https://blah.  The @123 portion is irrelevant.
       self.resources.append(self.url.split('@')[0])
@@ -438,8 +438,8 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
                    self.url, parsed_url)
       self.set_url(parsed_url)
 
-    elif isinstance(self.url, basestring):
-      parsed_url = urlparse.urlparse(self.url)
+    elif isinstance(self.url, str):
+      parsed_url = urllib.parse.urlparse(self.url)
       if (not parsed_url[0] and
           not re.match(r'^\w+\@[\w\.-]+\:[\w\/]+', parsed_url[2])):
         path = parsed_url[2]
@@ -562,7 +562,7 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
 
     # If a line is in custom_deps, but not in the solution, we want to append
     # this line to the solution.
-    for dep_name, dep_info in self.custom_deps.iteritems():
+    for dep_name, dep_info in self.custom_deps.items():
       if dep_name not in deps:
         deps[dep_name] = {'url': dep_info, 'dep_type': 'git'}
 
@@ -573,13 +573,13 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
     # recursively included by "src/ios_foo/DEPS" should also require
     # "checkout_ios=True".
     if self.condition:
-      for value in deps.itervalues():
+      for value in deps.values():
         gclient_eval.UpdateCondition(value, 'and', self.condition)
 
     if rel_prefix:
       logging.warning('use_relative_paths enabled.')
       rel_deps = {}
-      for d, url in deps.items():
+      for d, url in list(deps.items()):
         # normpath is required to allow DEPS to use .. in their
         # dependency local path.
         rel_deps[os.path.normpath(os.path.join(rel_prefix, d))] = url
@@ -591,7 +591,7 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
   def _deps_to_objects(self, deps, use_relative_paths):
     """Convert a deps dict to a dict of Dependency objects."""
     deps_to_add = []
-    for name, dep_value in deps.iteritems():
+    for name, dep_value in deps.items():
       should_process = self.should_process
       if dep_value is None:
         continue
@@ -695,7 +695,7 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
 
     self._vars = local_scope.get('vars', {})
     if self.parent:
-      for key, value in self.parent.get_vars().iteritems():
+      for key, value in self.parent.get_vars().items():
         if key in self._vars:
           self._vars[key] = value
     # Since we heavily post-process things, freeze ones which should
@@ -723,7 +723,7 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
 
     if 'recursedeps' in local_scope:
       for ent in local_scope['recursedeps']:
-        if isinstance(ent, basestring):
+        if isinstance(ent, str):
           self.recursedeps[ent] = self.deps_file
         else:  # (depname, depsfilename)
           self.recursedeps[ent[0]] = ent[1]
@@ -732,7 +732,7 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
       if rel_prefix:
         logging.warning('Updating recursedeps by prepending %s.', rel_prefix)
         rel_deps = {}
-        for depname, options in self.recursedeps.iteritems():
+        for depname, options in self.recursedeps.items():
           rel_deps[
               os.path.normpath(os.path.join(rel_prefix, depname))] = options
         self.recursedeps = rel_deps
@@ -801,8 +801,8 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
       # Don't enforce this for custom_deps.
       if dep.name in self._custom_deps:
         continue
-      if isinstance(dep.url, basestring):
-        parsed_url = urlparse.urlparse(dep.url)
+      if isinstance(dep.url, str):
+        parsed_url = urllib.parse.urlparse(dep.url)
         if parsed_url.netloc and parsed_url.netloc not in self._allowed_hosts:
           bad_deps.append(dep)
     return bad_deps
@@ -972,7 +972,7 @@ class Dependency(gclient_utils.WorkItem, DependencySettings):
     variables = self.get_vars()
     for arg in self._gn_args:
       value = variables[arg]
-      if isinstance(value, basestring):
+      if isinstance(value, str):
         value = gclient_eval.EvaluateCondition(value, variables)
       lines.append('%s = %s' % (arg, ToGNString(value)))
     with open(os.path.join(self.root.root_dir, self._gn_args_file), 'w') as f:
@@ -1294,7 +1294,7 @@ solutions = %(solution_list)s
     else:
       enforced_os = [self.DEPS_OS_CHOICES.get(sys.platform, 'unix')]
     if 'all' in enforced_os:
-      enforced_os = self.DEPS_OS_CHOICES.itervalues()
+      enforced_os = iter(self.DEPS_OS_CHOICES.values())
     self._enforced_os = tuple(set(enforced_os))
     self._enforced_cpu = detect_host_arch.HostArch(),
     self._root_dir = root_dir
@@ -1566,7 +1566,7 @@ it or fix the checkout.
           'The following --patch-ref flags were not used. Please fix it:\n%s' %
           ('\n'.join(
               patch_repo + '@' + patch_ref
-              for patch_repo, patch_ref in patch_refs.iteritems())))
+              for patch_repo, patch_ref in patch_refs.items())))
 
     if self._cipd_root:
       self._cipd_root.run(command)
@@ -1594,7 +1594,7 @@ it or fix the checkout.
       full_entries = [os.path.join(self.root_dir, e.replace('/', os.path.sep))
                       for e in entries]
 
-      for entry, prev_url in self._ReadEntries().iteritems():
+      for entry, prev_url in self._ReadEntries().items():
         if not prev_url:
           # entry must have been overridden via .gclient custom_deps
           continue
@@ -1738,7 +1738,7 @@ it or fix the checkout.
                 'url': rev.split('@')[0] if rev else None,
                 'rev': rev.split('@')[1] if rev and '@' in rev else None,
             }
-            for name, rev in entries.iteritems()
+            for name, rev in entries.items()
         }
         if self._options.output_json == '-':
           print(json.dumps(json_output, indent=2, separators=(',', ': ')))
@@ -1799,7 +1799,7 @@ class CipdDependency(Dependency):
       custom_vars, should_process, relative, condition):
     package = dep_value['package']
     version = dep_value['version']
-    url = urlparse.urljoin(
+    url = urllib.parse.urljoin(
         cipd_root.service_url, '%s@%s' % (package, version))
     super(CipdDependency, self).__init__(
         parent=parent,
@@ -2027,7 +2027,7 @@ class Flattener(object):
       self._flatten_dep(solution)
 
     if pin_all_deps:
-      for dep in self._deps.itervalues():
+      for dep in self._deps.values():
         self._pin_dep(dep)
 
     def add_deps_file(dep):
@@ -2045,7 +2045,7 @@ class Flattener(object):
           return
       assert dep.url
       self._deps_files.add((dep.url, deps_file, dep.hierarchy_data()))
-    for dep in self._deps.itervalues():
+    for dep in self._deps.values():
       add_deps_file(dep)
 
     gn_args_dep = self._deps.get(self._client.dependencies[0]._gn_args_from,
@@ -2088,13 +2088,13 @@ class Flattener(object):
     # Only include vars explicitly listed in the DEPS files or gclient solution,
     # not automatic, local overrides (i.e. not all of dep.get_vars()).
     hierarchy = dep.hierarchy(include_url=False)
-    for key, value in dep._vars.iteritems():
+    for key, value in dep._vars.items():
       # Make sure there are no conflicting variables. It is fine however
       # to use same variable name, as long as the value is consistent.
       assert key not in self._vars or self._vars[key][1] == value
       self._vars[key] = (hierarchy, value)
     # Override explicit custom variables.
-    for key, value in dep.custom_vars.iteritems():
+    for key, value in dep.custom_vars.items():
       # Do custom_vars that don't correspond to DEPS vars ever make sense? DEPS
       # conditionals shouldn't be using vars that aren't also defined in the
       # DEPS (presubmit actually disallows this), so any new custom_var must be
@@ -2184,7 +2184,7 @@ def _DepsToLines(deps):
   if not deps:
     return []
   s = ['deps = {']
-  for _, dep in sorted(deps.iteritems()):
+  for _, dep in sorted(deps.items()):
     s.extend(dep.ToLines())
   s.extend(['}', ''])
   return s
@@ -2195,9 +2195,9 @@ def _DepsOsToLines(deps_os):
   if not deps_os:
     return []
   s = ['deps_os = {']
-  for dep_os, os_deps in sorted(deps_os.iteritems()):
+  for dep_os, os_deps in sorted(deps_os.items()):
     s.append('  "%s": {' % dep_os)
-    for name, dep in sorted(os_deps.iteritems()):
+    for name, dep in sorted(os_deps.items()):
       condition_part = (['      "condition": %r,' % dep.condition]
                         if dep.condition else [])
       s.extend([
@@ -2245,7 +2245,7 @@ def _HooksOsToLines(hooks_os):
   if not hooks_os:
     return []
   s = ['hooks_os = {']
-  for hook_os, os_hooks in hooks_os.iteritems():
+  for hook_os, os_hooks in hooks_os.items():
     s.append('  "%s": [' % hook_os)
     for dep, hook in os_hooks:
       s.extend([
@@ -2275,7 +2275,7 @@ def _VarsToLines(variables):
   if not variables:
     return []
   s = ['vars = {']
-  for key, tup in sorted(variables.iteritems()):
+  for key, tup in sorted(variables.items()):
     hierarchy, value = tup
     s.extend([
         '  # %s' % hierarchy,

@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import ast
-import cStringIO
+import io
 import collections
 import logging
 import tokenize
@@ -20,7 +20,7 @@ class _NodeDict(collections.MutableMapping):
     self.tokens = tokens
 
   def __str__(self):
-    return str({k: v[0] for k, v in self.data.iteritems()})
+    return str({k: v[0] for k, v in self.data.items()})
 
   def __getitem__(self, key):
     return self.data[key][0]
@@ -40,13 +40,13 @@ class _NodeDict(collections.MutableMapping):
   def MoveTokens(self, origin, delta):
     if self.tokens:
       new_tokens = {}
-      for pos, token in self.tokens.iteritems():
+      for pos, token in self.tokens.items():
         if pos[0] >= origin:
           pos = (pos[0] + delta, pos[1])
           token = token[:2] + (pos,) + token[3:]
         new_tokens[pos] = token
 
-    for value, node in self.data.values():
+    for value, node in list(self.data.values()):
       if node.lineno >= origin:
         node.lineno += delta
         if isinstance(value, _NodeDict):
@@ -69,62 +69,62 @@ def _NodeDictSchema(dict_schema):
 
 # See https://github.com/keleshev/schema for docs how to configure schema.
 _GCLIENT_DEPS_SCHEMA = _NodeDictSchema({
-    schema.Optional(basestring): schema.Or(
+    schema.Optional(str): schema.Or(
         None,
-        basestring,
+        str,
         _NodeDictSchema({
             # Repo and revision to check out under the path
             # (same as if no dict was used).
-            'url': schema.Or(None, basestring),
+            'url': schema.Or(None, str),
 
             # Optional condition string. The dep will only be processed
             # if the condition evaluates to True.
-            schema.Optional('condition'): basestring,
+            schema.Optional('condition'): str,
 
-            schema.Optional('dep_type', default='git'): basestring,
+            schema.Optional('dep_type', default='git'): str,
         }),
         # CIPD package.
         _NodeDictSchema({
             'packages': [
                 _NodeDictSchema({
-                    'package': basestring,
+                    'package': str,
 
-                    'version': basestring,
+                    'version': str,
                 })
             ],
 
-            schema.Optional('condition'): basestring,
+            schema.Optional('condition'): str,
 
-            schema.Optional('dep_type', default='cipd'): basestring,
+            schema.Optional('dep_type', default='cipd'): str,
         }),
     ),
 })
 
 _GCLIENT_HOOKS_SCHEMA = [_NodeDictSchema({
     # Hook action: list of command-line arguments to invoke.
-    'action': [basestring],
+    'action': [str],
 
     # Name of the hook. Doesn't affect operation.
-    schema.Optional('name'): basestring,
+    schema.Optional('name'): str,
 
     # Hook pattern (regex). Originally intended to limit some hooks to run
     # only when files matching the pattern have changed. In practice, with git,
     # gclient runs all the hooks regardless of this field.
-    schema.Optional('pattern'): basestring,
+    schema.Optional('pattern'): str,
 
     # Working directory where to execute the hook.
-    schema.Optional('cwd'): basestring,
+    schema.Optional('cwd'): str,
 
     # Optional condition string. The hook will only be run
     # if the condition evaluates to True.
-    schema.Optional('condition'): basestring,
+    schema.Optional('condition'): str,
 })]
 
 _GCLIENT_SCHEMA = schema.Schema(_NodeDictSchema({
     # List of host names from which dependencies are allowed (whitelist).
     # NOTE: when not present, all hosts are allowed.
     # NOTE: scoped to current DEPS file, not recursive.
-    schema.Optional('allowed_hosts'): [schema.Optional(basestring)],
+    schema.Optional('allowed_hosts'): [schema.Optional(str)],
 
     # Mapping from paths to repo and revision to check out under that path.
     # Applying this mapping to the on-disk checkout is the main purpose
@@ -139,19 +139,19 @@ _GCLIENT_SCHEMA = schema.Schema(_NodeDictSchema({
     # Similar to 'deps' (see above) - also keyed by OS (e.g. 'linux').
     # Also see 'target_os'.
     schema.Optional('deps_os'): _NodeDictSchema({
-        schema.Optional(basestring): _GCLIENT_DEPS_SCHEMA,
+        schema.Optional(str): _GCLIENT_DEPS_SCHEMA,
     }),
 
     # Dependency to get gclient_gn_args* settings from. This allows these values
     # to be set in a recursedeps file, rather than requiring that they exist in
     # the top-level solution.
-    schema.Optional('gclient_gn_args_from'): basestring,
+    schema.Optional('gclient_gn_args_from'): str,
 
     # Path to GN args file to write selected variables.
-    schema.Optional('gclient_gn_args_file'): basestring,
+    schema.Optional('gclient_gn_args_file'): str,
 
     # Subset of variables to write to the GN args file (see above).
-    schema.Optional('gclient_gn_args'): [schema.Optional(basestring)],
+    schema.Optional('gclient_gn_args'): [schema.Optional(str)],
 
     # Hooks executed after gclient sync (unless suppressed), or explicitly
     # on gclient hooks. See _GCLIENT_HOOKS_SCHEMA for details.
@@ -160,12 +160,12 @@ _GCLIENT_SCHEMA = schema.Schema(_NodeDictSchema({
 
     # Similar to 'hooks', also keyed by OS.
     schema.Optional('hooks_os'): _NodeDictSchema({
-        schema.Optional(basestring): _GCLIENT_HOOKS_SCHEMA
+        schema.Optional(str): _GCLIENT_HOOKS_SCHEMA
     }),
 
     # Rules which #includes are allowed in the directory.
     # Also see 'skip_child_includes' and 'specific_include_rules'.
-    schema.Optional('include_rules'): [schema.Optional(basestring)],
+    schema.Optional('include_rules'): [schema.Optional(str)],
 
     # Hooks executed before processing DEPS. See 'hooks' for more details.
     schema.Optional('pre_deps_hooks'): _GCLIENT_HOOKS_SCHEMA,
@@ -176,24 +176,24 @@ _GCLIENT_SCHEMA = schema.Schema(_NodeDictSchema({
     # Whitelists deps for which recursion should be enabled.
     schema.Optional('recursedeps'): [
         schema.Optional(schema.Or(
-            basestring,
-            (basestring, basestring),
-            [basestring, basestring]
+            str,
+            (str, str),
+            [str, str]
         )),
     ],
 
     # Blacklists directories for checking 'include_rules'.
-    schema.Optional('skip_child_includes'): [schema.Optional(basestring)],
+    schema.Optional('skip_child_includes'): [schema.Optional(str)],
 
     # Mapping from paths to include rules specific for that path.
     # See 'include_rules' for more details.
     schema.Optional('specific_include_rules'): _NodeDictSchema({
-        schema.Optional(basestring): [basestring]
+        schema.Optional(str): [str]
     }),
 
     # List of additional OS names to consider when selecting dependencies
     # from deps_os.
-    schema.Optional('target_os'): [schema.Optional(basestring)],
+    schema.Optional('target_os'): [schema.Optional(str)],
 
     # For recursed-upon sub-dependencies, check out their own dependencies
     # relative to the paren't path, rather than relative to the .gclient file.
@@ -201,7 +201,7 @@ _GCLIENT_SCHEMA = schema.Schema(_NodeDictSchema({
 
     # Variables that can be referenced using Var() - see 'deps'.
     schema.Optional('vars'): _NodeDictSchema({
-        schema.Optional(basestring): schema.Or(basestring, bool),
+        schema.Optional(str): schema.Or(str, bool),
     }),
 }))
 
@@ -209,7 +209,7 @@ _GCLIENT_SCHEMA = schema.Schema(_NodeDictSchema({
 def _gclient_eval(node_or_string, filename='<unknown>', vars_dict=None):
   """Safely evaluates a single expression. Returns the result."""
   _allowed_names = {'None': None, 'True': True, 'False': False}
-  if isinstance(node_or_string, basestring):
+  if isinstance(node_or_string, str):
     node_or_string = ast.parse(node_or_string, filename=filename, mode='eval')
   if isinstance(node_or_string, ast.Expression):
     node_or_string = node_or_string.body
@@ -249,7 +249,7 @@ def _gclient_eval(node_or_string, filename='<unknown>', vars_dict=None):
             'Var takes exactly one argument (file %r, line %s)' % (
                 filename, getattr(node, 'lineno', '<unknown>')))
       arg = _convert(node.args[0])
-      if not isinstance(arg, basestring):
+      if not isinstance(arg, str):
         raise ValueError(
             'Var\'s argument must be a variable name (file %r, line %s)' % (
                 filename, getattr(node, 'lineno', '<unknown>')))
@@ -317,7 +317,7 @@ def Exec(content, filename='<unknown>', vars_override=None):
   tokens = {
       token[2]: list(token)
       for token in tokenize.generate_tokens(
-          cStringIO.StringIO(content).readline)
+          io.StringIO(content).readline)
   }
   local_scope = _NodeDict({}, tokens)
 
@@ -333,10 +333,10 @@ def Exec(content, filename='<unknown>', vars_override=None):
     if vars_override:
       vars_dict.update({
         k: v
-        for k, v in vars_override.iteritems()
+        for k, v in vars_override.items()
         if k in vars_dict})
 
-  for name, node in statements.iteritems():
+  for name, node in statements.items():
     value = _gclient_eval(node, filename, vars_dict)
     local_scope.SetNode(name, value, node)
 
@@ -362,17 +362,17 @@ def ExecLegacy(content, filename='<unknown>', vars_override=None):
   if vars_override:
     vars_dict.update({
         k: v
-        for k, v in vars_override.iteritems()
+        for k, v in vars_override.items()
         if k in vars_dict
     })
 
   def _DeepFormat(node):
-    if isinstance(node, basestring):
+    if isinstance(node, str):
       return node.format(**vars_dict)
     elif isinstance(node, dict):
       return {
           k.format(**vars_dict): _DeepFormat(v)
-          for k, v in node.iteritems()
+          for k, v in node.items()
       }
     elif isinstance(node, list):
       return [_DeepFormat(elem) for elem in node]
@@ -393,7 +393,7 @@ def _StandardizeDeps(deps_dict, vars_dict):
   - Set's the 'dep_type' to be 'git' by default.
   """
   new_deps_dict = {}
-  for dep_name, dep_info in deps_dict.items():
+  for dep_name, dep_info in list(deps_dict.items()):
     dep_name = dep_name.format(**vars_dict)
     if not isinstance(dep_info, collections.Mapping):
       dep_info = {'url': dep_info}
@@ -409,7 +409,7 @@ def _MergeDepsOs(deps_dict, os_deps_dict, os_name):
   using |'checkout_' + os_name|.
   If the dependency is already present, the URL and revision must coincide.
   """
-  for dep_name, dep_info in os_deps_dict.items():
+  for dep_name, dep_info in list(os_deps_dict.items()):
     # Make this condition very visible, so it's not a silent failure.
     # It's unclear how to support None override in deps_os.
     if dep_info['url'] is None:
@@ -480,14 +480,14 @@ def Parse(content, validate_syntax, filename, vars_override=None):
 
   if 'deps_os' in result:
     deps = result.setdefault('deps', {})
-    for os_name, os_deps in result['deps_os'].iteritems():
+    for os_name, os_deps in result['deps_os'].items():
       os_deps = _StandardizeDeps(os_deps, vars_dict)
       _MergeDepsOs(deps, os_deps, os_name)
     del result['deps_os']
 
   if 'hooks_os' in result:
     hooks = result.setdefault('hooks', [])
-    for os_name, os_hooks in result['hooks_os'].iteritems():
+    for os_name, os_hooks in result['hooks_os'].items():
       for hook in os_hooks:
         UpdateCondition(hook, 'and', 'checkout_' + os_name)
       hooks.extend(os_hooks)
@@ -519,7 +519,7 @@ def EvaluateCondition(condition, variables, referenced_variables=None):
 
         # Allow using "native" types, without wrapping everything in strings.
         # Note that schema constraints still apply to variables.
-        if not isinstance(value, basestring):
+        if not isinstance(value, str):
           return value
 
         # Recursively evaluate the variable reference.
@@ -596,7 +596,7 @@ def EvaluateCondition(condition, variables, referenced_variables=None):
 
 
 def RenderDEPSFile(gclient_dict):
-  contents = sorted(gclient_dict.tokens.values(), key=lambda token: token[2])
+  contents = sorted(list(gclient_dict.tokens.values()), key=lambda token: token[2])
   return tokenize.untokenize(contents)
 
 
@@ -609,7 +609,7 @@ def _UpdateAstString(tokens, node, value):
 
 def _ShiftLinesInTokens(tokens, delta, start):
   new_tokens = {}
-  for token in tokens.values():
+  for token in list(tokens.values()):
     if token[2][0] >= start:
       token[2] = token[2][0] + delta, token[2][1]
       token[3] = token[3][0] + delta, token[3][1]
@@ -661,7 +661,7 @@ def AddVar(gclient_dict, var_name, value):
 
   # Update the tokens.
   var_tokens = list(tokenize.generate_tokens(
-      cStringIO.StringIO(var_content).readline))
+      io.StringIO(var_content).readline))
   var_tokens = {
       token[2]: list(token)
       # Ignore the tokens corresponding to braces and new lines.
@@ -818,7 +818,7 @@ def GetRevision(gclient_dict, dep_name):
   dep = gclient_dict['deps'][dep_name]
   if dep is None:
     return None
-  elif isinstance(dep, basestring):
+  elif isinstance(dep, str):
     _, _, revision = dep.partition('@')
     return revision or None
   elif isinstance(dep, collections.Mapping) and 'url' in dep:

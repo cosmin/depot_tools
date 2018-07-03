@@ -35,7 +35,7 @@ import os
 import subprocess
 from string import Formatter
 import sys
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import re
 
 import auth
@@ -60,7 +60,7 @@ class DefaultFormatter(Formatter):
     self.default = default
 
   def get_value(self, key, args, kwds):
-    if isinstance(key, basestring) and key not in kwds:
+    if isinstance(key, str) and key not in kwds:
       return self.default
     return Formatter.get_value(self, key, args, kwds)
 
@@ -160,7 +160,7 @@ def get_week_of(date):
 
 def get_yes_or_no(msg):
   while True:
-    response = raw_input(msg + ' yes/no [no] ')
+    response = input(msg + ' yes/no [no] ')
     if response == 'y' or response == 'yes':
       return True
     elif not response or response == 'n' or response == 'no':
@@ -253,18 +253,14 @@ class MyActivity(object):
         with_messages=True)
     self.show_progress()
 
-    issues = filter(
-        lambda i: (datetime_from_rietveld(i['created']) < self.modified_before),
-        issues)
-    issues = filter(
-        lambda i: (datetime_from_rietveld(i['modified']) > self.modified_after),
-        issues)
+    issues = [i for i in issues if (datetime_from_rietveld(i['created']) < self.modified_before)]
+    issues = [i for i in issues if (datetime_from_rietveld(i['modified']) > self.modified_after)]
 
     should_filter_by_user = True
-    issues = map(partial(self.process_rietveld_issue, remote, instance), issues)
-    issues = filter(
+    issues = list(map(partial(self.process_rietveld_issue, remote, instance), issues))
+    issues = list(filter(
         partial(self.filter_issue, should_filter_by_user=should_filter_by_user),
-        issues)
+        issues))
     issues = sorted(issues, key=lambda i: i['modified'], reverse=True)
 
     return issues
@@ -303,8 +299,8 @@ class MyActivity(object):
           issue['patchsets'][-1])
       self.show_progress()
       ret['delta'] = '+%d,-%d' % (
-          sum(f['num_added'] for f in patchset_props['files'].itervalues()),
-          sum(f['num_removed'] for f in patchset_props['files'].itervalues()))
+          sum(f['num_added'] for f in patchset_props['files'].values()),
+          sum(f['num_removed'] for f in patchset_props['files'].values()))
 
     if issue['landed_days_ago'] != 'unknown':
       ret['status'] = 'committed'
@@ -361,7 +357,7 @@ class MyActivity(object):
       return list(gerrit_util.GenerateAllChanges(instance['url'], req,
           o_params=['MESSAGES', 'LABELS', 'DETAILED_ACCOUNTS',
                     'CURRENT_REVISION', 'CURRENT_COMMIT']))
-    except gerrit_util.GerritError, e:
+    except gerrit_util.GerritError as e:
       error_message = 'Looking up %r: %s' % (instance['url'], e)
       if error_message not in self.access_errors:
         self.access_errors.add(error_message)
@@ -379,7 +375,7 @@ class MyActivity(object):
               for issue in issues]
 
     # TODO(cjhopman): should we filter abandoned changes?
-    issues = filter(self.filter_issue, issues)
+    issues = list(filter(self.filter_issue, issues))
     issues = sorted(issues, key=lambda i: i['modified'], reverse=True)
 
     return issues
@@ -416,8 +412,7 @@ class MyActivity(object):
   @staticmethod
   def process_gerrit_issue_replies(replies):
     ret = []
-    replies = filter(lambda r: 'author' in r and 'email' in r['author'],
-        replies)
+    replies = [r for r in replies if 'author' in r and 'email' in r['author']]
     for reply in replies:
       ret.append({
         'author': reply['author']['email'],
@@ -470,7 +465,7 @@ class MyActivity(object):
     http = self.monorail_get_auth_http()
     url = ('https://monorail-prod.appspot.com/_ah/api/monorail/v1/projects'
            '/%s/issues') % project
-    query_data = urllib.urlencode(query)
+    query_data = urllib.parse.urlencode(query)
     url = url + '?' + query_data
     _, body = http.request(url)
     self.show_progress()
@@ -535,8 +530,8 @@ class MyActivity(object):
     })
 
   def print_heading(self, heading):
-    print
-    print self.options.output_format_heading.format(heading=heading)
+    print()
+    print(self.options.output_format_heading.format(heading=heading))
 
   def match(self, author):
     if '@' in self.user:
@@ -607,7 +602,7 @@ class MyActivity(object):
                     title, url, author,
                     optional_values=None):
     output_format = specific_fmt if specific_fmt is not None else default_fmt
-    output_format = unicode(output_format)
+    output_format = str(output_format)
     values = {
         'title': title,
         'url': url,
@@ -615,8 +610,8 @@ class MyActivity(object):
     }
     if optional_values is not None:
       values.update(optional_values)
-    print DefaultFormatter().format(output_format, **values).encode(
-        sys.getdefaultencoding())
+    print(DefaultFormatter().format(output_format, **values).encode(
+        sys.getdefaultencoding()))
 
 
   def filter_issue(self, issue, should_filter_by_user=True):
@@ -700,7 +695,7 @@ class MyActivity(object):
   def get_issues(self):
     with contextlib.closing(ThreadPool(len(monorail_projects))) as pool:
       monorail_issues = pool.map(
-          self.monorail_issue_search, monorail_projects.keys())
+          self.monorail_issue_search, list(monorail_projects.keys()))
       monorail_issues = list(itertools.chain.from_iterable(monorail_issues))
 
     if not monorail_issues:
@@ -728,7 +723,7 @@ class MyActivity(object):
       project, issue_id = issue_uid.split(':')
       missing_issues_by_project[project].append(issue_id)
 
-    for project, issue_ids in missing_issues_by_project.iteritems():
+    for project, issue_ids in missing_issues_by_project.items():
       self.referenced_issues += self.monorail_get_issues(project, issue_ids)
 
   def print_issues(self):
@@ -764,25 +759,25 @@ class MyActivity(object):
       if changes_by_issue_uid[issue_uid] or not skip_empty_own:
         self.print_issue(issues[issue_uid])
       if changes_by_issue_uid[issue_uid]:
-        print
+        print()
         for change in changes_by_issue_uid[issue_uid]:
-          print '   ',  # this prints one space due to comma, but no newline
+          print('   ', end=' ')  # this prints one space due to comma, but no newline
           self.print_change(change)
-        print
+        print()
 
     # Changes referencing others' issues.
     for issue_uid in ref_issues:
       assert changes_by_ref_issue_uid[issue_uid]
       self.print_issue(ref_issues[issue_uid])
       for change in changes_by_ref_issue_uid[issue_uid]:
-        print '',  # this prints one space due to comma, but no newline
+        print('', end=' ')  # this prints one space due to comma, but no newline
         self.print_change(change)
 
     # Changes referencing no issues.
     if changes_without_issue:
-      print self.options.output_format_no_url.format(title='Other changes')
+      print(self.options.output_format_no_url.format(title='Other changes'))
       for change in changes_without_issue:
-        print '',  # this prints one space due to comma, but no newline
+        print('', end=' ')  # this prints one space due to comma, but no newline
         self.print_change(change)
 
   def print_activity(self):
@@ -801,7 +796,7 @@ class MyActivity(object):
         if not url:
           raise Exception('Dumped item %s does not specify url' % item)
         output[url] = dict(
-            (k, v) for k,v in item.iteritems() if k not in ignore_keys)
+            (k, v) for k,v in item.items() if k not in ignore_keys)
       return output
 
     class PythonObjectEncoder(json.JSONEncoder):
@@ -817,7 +812,7 @@ class MyActivity(object):
       'changes': format_for_json_dump(self.changes),
       'issues': format_for_json_dump(self.issues)
     }
-    print json.dumps(output, indent=2, cls=PythonObjectEncoder)
+    print(json.dumps(output, indent=2, cls=PythonObjectEncoder))
 
 
 def main():
@@ -904,7 +899,7 @@ def main():
                               'override the generic format.')
   output_format_group.add_option(
       '-f', '--output-format', metavar='<format>',
-      default=u'{url} {title}',
+      default='{url} {title}',
       help='Specifies the format to use when printing all your activity.')
   output_format_group.add_option(
       '--output-format-changes', metavar='<format>',
@@ -922,7 +917,7 @@ def main():
       help='Specifies the format to use when printing reviews.')
   output_format_group.add_option(
       '--output-format-heading', metavar='<format>',
-      default=u'{heading}:',
+      default='{heading}:',
       help='Specifies the format to use when printing headings.')
   output_format_group.add_option(
       '--output-format-no-url', default='{title}',

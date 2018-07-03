@@ -7,7 +7,7 @@
 
 """A git-command for integrating reviews on Rietveld and Gerrit."""
 
-from __future__ import print_function
+
 
 from distutils.version import LooseVersion
 from multiprocessing.pool import ThreadPool
@@ -16,7 +16,7 @@ import collections
 import contextlib
 import datetime
 import fnmatch
-import httplib
+import http.client
 import itertools
 import json
 import logging
@@ -29,9 +29,9 @@ import stat
 import sys
 import tempfile
 import textwrap
-import urllib
-import urllib2
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
+import urllib.parse
 import uuid
 import webbrowser
 import zlib
@@ -182,7 +182,7 @@ def time_sleep(seconds):
 
 def ask_for_data(prompt):
   try:
-    return raw_input(prompt)
+    return input(prompt)
   except KeyboardInterrupt:
     # Hide the exception.
     sys.exit(1)
@@ -296,7 +296,7 @@ def _git_amend_head(message, committer_timestamp):
 
 def _get_properties_from_options(options):
   properties = dict(x.split('=', 1) for x in options.properties)
-  for key, val in properties.iteritems():
+  for key, val in properties.items():
     try:
       properties[key] = json.loads(val)
     except ValueError:
@@ -388,7 +388,7 @@ def _get_bucket_map(changelist, options, option_parser):
         output_stream=sys.stdout)
     if masters is None:
       return None
-    return {_prefix_master(m): b for m, b in masters.iteritems()}
+    return {_prefix_master(m): b for m, b in masters.items()}
 
   if options.bucket:
     return {options.bucket: {b: [] for b in options.bot}}
@@ -410,8 +410,8 @@ def _get_bucket_map_for_builders(builders):
   """Returns a map of buckets to builders for the given builders."""
   map_url = 'https://builders-map.appspot.com/'
   try:
-    builders_map = json.load(urllib2.urlopen(map_url))
-  except urllib2.URLError as e:
+    builders_map = json.load(urllib.request.urlopen(map_url))
+  except urllib.error.URLError as e:
     return None, ('Failed to fetch builder-to-master map from %s. Error: %s.' %
                   (map_url, e))
   except ValueError as e:
@@ -442,7 +442,7 @@ def _trigger_try_jobs(auth_config, changelist, buckets, options, patchset):
   patchset = patchset or changelist.GetMostRecentPatchset()
   assert patchset, 'CL must be uploaded first'
 
-  codereview_host = urlparse.urlparse(codereview_url).hostname
+  codereview_host = urllib.parse.urlparse(codereview_url).hostname
   # Cache the buildbucket credentials under the codereview host key, so that
   # users can use different credentials for different buckets.
   authenticator = auth.get_authenticator_for_host(codereview_host, auth_config)
@@ -469,12 +469,12 @@ def _trigger_try_jobs(auth_config, changelist, buckets, options, patchset):
   batch_req_body = {'builds': []}
   print_text = []
   print_text.append('Tried jobs on:')
-  for bucket, builders_and_tests in sorted(buckets.iteritems()):
+  for bucket, builders_and_tests in sorted(buckets.items()):
     print_text.append('Bucket: %s' % bucket)
     master = None
     if bucket.startswith(MASTER_PREFIX):
       master = _unprefix_master(bucket)
-    for builder, tests in sorted(builders_and_tests.iteritems()):
+    for builder, tests in sorted(builders_and_tests.items()):
       print_text.append('  %s: %s' % (builder, tests))
       parameters = {
           'builder_name': builder,
@@ -533,7 +533,7 @@ def fetch_try_jobs(auth_config, changelist, buildbucket_host,
   assert patchset, 'CL must be uploaded first'
 
   codereview_url = changelist.GetCodereviewServer()
-  codereview_host = urlparse.urlparse(codereview_url).hostname
+  codereview_host = urllib.parse.urlparse(codereview_url).hostname
   authenticator = auth.get_authenticator_for_host(codereview_host, auth_config)
   if authenticator.has_cached_credentials():
     http = authenticator.authorize(httplib2.Http())
@@ -556,7 +556,7 @@ def fetch_try_jobs(auth_config, changelist, buildbucket_host,
   while True:
     url = 'https://{hostname}/_ah/api/buildbucket/v1/search?{params}'.format(
         hostname=buildbucket_host,
-        params=urllib.urlencode(params))
+        params=urllib.parse.urlencode(params))
     content = _buildbucket_retry('fetching try jobs', http, url, 'GET')
     for build in content.get('builds', []):
       builds[build['id']] = build
@@ -599,13 +599,13 @@ def print_try_jobs(options, builds):
 
   if options.print_master:
     name_fmt = '%%-%ds %%-%ds' % (
-        max(len(str(get_bucket(b))) for b in builds.itervalues()),
-        max(len(str(get_builder(b))) for b in builds.itervalues()))
+        max(len(str(get_bucket(b))) for b in builds.values()),
+        max(len(str(get_builder(b))) for b in builds.values()))
     def get_name(b):
       return name_fmt % (get_bucket(b), get_builder(b))
   else:
     name_fmt = '%%-%ds' % (
-        max(len(str(get_builder(b))) for b in builds.itervalues()))
+        max(len(str(get_builder(b))) for b in builds.values()))
     def get_name(b):
       return name_fmt % get_builder(b)
 
@@ -621,8 +621,8 @@ def print_try_jobs(options, builds):
       colorize = lambda x: '%s%s%s' % (color, x, Fore.RESET)
 
     result = []
-    for b in builds.values():
-      if all(b.get(k) == v for k, v in kwargs.iteritems()):
+    for b in list(builds.values()):
+      if all(b.get(k) == v for k, v in kwargs.items()):
         builds.pop(b['id'])
         result.append(b)
     if result:
@@ -928,7 +928,7 @@ def _is_git_numberer_enabled(remote_url, remote_ref):
   ]
 
   assert remote_ref and remote_ref.startswith('refs/'), remote_ref
-  url_parts = urlparse.urlparse(remote_url)
+  url_parts = urllib.parse.urlparse(remote_url)
   project_name = url_parts.path.lstrip('/').rstrip('git./')
   for known in KNOWN_PROJECTS_WHITELIST:
     if project_name.endswith(known):
@@ -950,7 +950,7 @@ def _is_git_numberer_enabled(remote_url, remote_ref):
       if code == 0:
         return out.strip().splitlines()
       return []
-    enabled, disabled = map(get_opts, ['enabled', 'disabled'])
+    enabled, disabled = list(map(get_opts, ['enabled', 'disabled']))
 
   logging.info('validator config enabled %s disabled %s refglobs for '
                '(this ref: %s)', enabled, disabled, remote_ref)
@@ -1021,7 +1021,7 @@ def ParseIssueNumberArgument(arg, codereview=None):
 
   url = gclient_utils.UpgradeToHttps(arg)
   try:
-    parsed_url = urlparse.urlparse(url)
+    parsed_url = urllib.parse.urlparse(url)
   except ValueError:
     return fail_result
 
@@ -1030,7 +1030,7 @@ def ParseIssueNumberArgument(arg, codereview=None):
     return parsed or fail_result
 
   results = {}
-  for name, cls in _CODEREVIEW_IMPLEMENTATIONS.iteritems():
+  for name, cls in _CODEREVIEW_IMPLEMENTATIONS.items():
     parsed = cls.ParseIssueURL(parsed_url)
     if parsed is not None:
       results[name] = parsed
@@ -1038,7 +1038,7 @@ def ParseIssueNumberArgument(arg, codereview=None):
   if not results:
     return fail_result
   if len(results) == 1:
-    return results.values()[0]
+    return list(results.values())[0]
 
   if parsed_url.netloc and parsed_url.netloc.split('.')[0].endswith('-review'):
     # This is likely Gerrit.
@@ -1134,7 +1134,7 @@ class Changelist(object):
     # Whether we find issue or not, we are doing the lookup.
     self.lookedup_issue = True
     if self.GetBranch():
-      for codereview, cls in _CODEREVIEW_IMPLEMENTATIONS.iteritems():
+      for codereview, cls in _CODEREVIEW_IMPLEMENTATIONS.items():
         issue = _git_get_branch_config_value(
             cls.IssueConfigKey(), value_type=int, branch=self.GetBranch())
         if issue:
@@ -1160,7 +1160,7 @@ class Changelist(object):
     if self.cc is None:
       base_cc = settings.GetDefaultCCList()
       more_cc = ','.join(self.more_cc)
-      self.cc = ','.join(filter(None, (base_cc, more_cc))) or ''
+      self.cc = ','.join([_f for _f in (base_cc, more_cc) if _f]) or ''
     return self.cc
 
   def GetCCListWithoutDefault(self):
@@ -1533,12 +1533,12 @@ class Changelist(object):
 
   def CMDPatchIssue(self, issue_arg, reject, nocommit, directory):
     """Fetches and applies the issue patch from codereview to local branch."""
-    if isinstance(issue_arg, (int, long)) or issue_arg.isdigit():
+    if isinstance(issue_arg, int) or issue_arg.isdigit():
       parsed_issue_arg = _ParsedIssueNumberArgument(int(issue_arg))
     else:
       # Assume url.
       parsed_issue_arg = self._codereview_impl.ParseIssueURL(
-          urlparse.urlparse(issue_arg))
+          urllib.parse.urlparse(issue_arg))
     if not parsed_issue_arg or not parsed_issue_arg.valid:
       DieWithError('Failed to parse issue argument "%s". '
                    'Must be an issue number or a valid URL.' % issue_arg)
@@ -1949,7 +1949,7 @@ class _RietveldChangelistImpl(_ChangelistCodereviewBase):
     assert issue
     try:
       return self.RpcServer().get_description(issue, force=force).strip()
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
       if e.code == 404:
         DieWithError(
             ('\nWhile fetching the description for issue %d, received a '
@@ -1963,7 +1963,7 @@ class _RietveldChangelistImpl(_ChangelistCodereviewBase):
       else:
         DieWithError(
             '\nFailed to fetch issue description. HTTP error %d' % e.code)
-    except urllib2.URLError as e:
+    except urllib.error.URLError as e:
       print('Warning: Failed to retrieve CL description due to network '
             'failure.', file=sys.stderr)
       return ''
@@ -2042,7 +2042,7 @@ class _RietveldChangelistImpl(_ChangelistCodereviewBase):
 
     try:
       props = self.GetIssueProperties()
-    except urllib2.HTTPError:
+    except urllib.error.HTTPError:
       return 'error'
 
     if props.get('closed'):
@@ -2095,7 +2095,7 @@ class _RietveldChangelistImpl(_ChangelistCodereviewBase):
     try:
       return self.RpcServer().set_flags(
           self.GetIssue(), patchset, flags)
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
       if e.code == 404:
         DieWithError('The issue %s doesn\'t exist.' % self.GetIssue())
       if e.code == 403:
@@ -2264,9 +2264,9 @@ class _RietveldChangelistImpl(_ChangelistCodereviewBase):
         cc = self.GetCCListWithoutDefault()
       else:
         cc = self.GetCCList()
-      cc = ','.join(filter(None, (cc, ','.join(options.cc))))
+      cc = ','.join([_f for _f in (cc, ','.join(options.cc)) if _f])
       if change_desc.get_cced():
-        cc = ','.join(filter(None, (cc, ','.join(change_desc.get_cced()))))
+        cc = ','.join([_f for _f in (cc, ','.join(change_desc.get_cced())) if _f])
       if cc:
         upload_args.extend(['--cc', cc])
 
@@ -2368,7 +2368,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
     if self._gerrit_host and '.' not in self._gerrit_host:
       # Abbreviated domain like "chromium" instead of chromium.googlesource.com.
       # This happens for internal stuff http://crbug.com/614312.
-      parsed = urlparse.urlparse(self.GetRemoteUrl())
+      parsed = urllib.parse.urlparse(self.GetRemoteUrl())
       if parsed.scheme == 'sso':
         print('WARNING: using non-https URLs for remote is likely broken\n'
               '  Your current remote is: %s'  % self.GetRemoteUrl())
@@ -2378,7 +2378,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
 
   def _GetGitHost(self):
     """Returns git host to be used when uploading change to Gerrit."""
-    return urlparse.urlparse(self.GetRemoteUrl()).netloc
+    return urllib.parse.urlparse(self.GetRemoteUrl()).netloc
 
   def GetCodereviewServer(self):
     if not self._gerrit_server:
@@ -2388,7 +2388,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
         self._gerrit_server = self._GitGetBranchConfigValue(
             self.CodereviewServerConfigKey())
         if self._gerrit_server:
-          self._gerrit_host = urlparse.urlparse(self._gerrit_server).netloc
+          self._gerrit_host = urllib.parse.urlparse(self._gerrit_server).netloc
       if not self._gerrit_server:
         # We assume repo to be hosted on Gerrit, and hence Gerrit server
         # has "-review" suffix for lowest level subdomain.
@@ -2519,7 +2519,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
     try:
       data = self._GetChangeDetail([
           'DETAILED_LABELS', 'CURRENT_REVISION', 'SUBMITTABLE'])
-    except (httplib.HTTPException, GerritChangeNotExists):
+    except (http.client.HTTPException, GerritChangeNotExists):
       return 'error'
 
     if data['status'] in ('ABANDONED', 'MERGED'):
@@ -2594,7 +2594,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
     # {author+date: {path: {patchset: {line: url+message}}}}
     comments = collections.defaultdict(
         lambda: collections.defaultdict(lambda: collections.defaultdict(dict)))
-    for path, line_comments in file_comments.iteritems():
+    for path, line_comments in file_comments.items():
       for comment in line_comments:
         if comment.get('tag', '').startswith('autogenerated'):
           continue
@@ -2721,7 +2721,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
     if git_common.is_dirty_git_tree('land'):
       return 1
     detail = self._GetChangeDetail(['CURRENT_REVISION', 'LABELS'])
-    if u'Commit-Queue' in detail.get('labels', {}):
+    if 'Commit-Queue' in detail.get('labels', {}):
       if not force:
         confirm_or_exit('\nIt seems this repository has a Commit Queue, '
                         'which can test and land changes for you. '
@@ -2787,7 +2787,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
       patchset = int(revision_info['_number'])
     else:
       patchset = parsed_issue_arg.patchset
-      for revision_info in detail['revisions'].itervalues():
+      for revision_info in detail['revisions'].values():
         if int(revision_info['_number']) == parsed_issue_arg.patchset:
           break
       else:
@@ -3113,7 +3113,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
       cc = []
     if options.cc:
       cc.extend(options.cc)
-    cc = filter(None, [email.strip() for email in cc])
+    cc = [_f for _f in [email.strip() for email in cc] if _f]
     if change_desc.get_cced():
       cc.extend(change_desc.get_cced())
 
@@ -3125,7 +3125,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
       labels = self._GetChangeDetail(['LABELS']).get('labels', {})
       score = 1
       if 'Code-Review' in labels and 'values' in labels['Code-Review']:
-        score = max([int(x) for x in labels['Code-Review']['values'].keys()])
+        score = max([int(x) for x in list(labels['Code-Review']['values'].keys())])
       print('Adding self-LGTM (Code-Review +%d) because of TBRs.' % score)
       gerrit_util.SetReview(
           self._GetGerritHost(), self.GetIssue(),
@@ -3250,7 +3250,7 @@ class _GerritChangelistImpl(_ChangelistCodereviewBase):
     patchset = int(patchset or self.GetPatchset())
     assert patchset
     revision_data = None  # Pylint wants it to be defined.
-    for revision_data in data['revisions'].itervalues():
+    for revision_data in data['revisions'].values():
       if int(revision_data['_number']) == patchset:
         break
     else:
@@ -3373,7 +3373,7 @@ class ChangeDescription(object):
     return '\n'.join(self._description_lines)
 
   def set_description(self, desc):
-    if isinstance(desc, basestring):
+    if isinstance(desc, str):
       lines = desc.splitlines()
     else:
       lines = [line.rstrip() for line in desc]
@@ -3708,7 +3708,7 @@ def urlretrieve(source, destination):
   """urllib is broken for SSL connections via a proxy therefore we
   can't use urllib.urlretrieve()."""
   with open(destination, 'w') as f:
-    f.write(urllib2.urlopen(source).read())
+    f.write(urllib.request.urlopen(source).read())
 
 
 def hasSheBang(fname):
@@ -3866,8 +3866,8 @@ class _GitCookiesChecker(object):
       self._all_hosts = [
           (h, u, s)
           for h, u, s in itertools.chain(
-              ((h, u, '.netrc') for h, (u, _, _) in a.netrc.hosts.iteritems()),
-              ((h, u, '.gitcookies') for h, (u, _) in a.gitcookies.iteritems())
+              ((h, u, '.netrc') for h, (u, _, _) in a.netrc.hosts.items()),
+              ((h, u, '.gitcookies') for h, (u, _) in a.gitcookies.items())
           )
           if h.endswith(self._GOOGLESOURCE)
       ]
@@ -3881,7 +3881,7 @@ class _GitCookiesChecker(object):
     if not hosts:
       print('No Git/Gerrit credentials found')
       return
-    lengths = [max(map(len, (row[i] for row in hosts))) for i in xrange(3)]
+    lengths = [max(list(map(len, (row[i] for row in hosts)))) for i in range(3)]
     header = [('Host', 'User', 'Which file'),
               ['=' * l for l in lengths]]
     for row in (header + hosts):
@@ -3956,18 +3956,18 @@ class _GitCookiesChecker(object):
   def get_partially_configured_hosts(self):
     return set(
         (host if i1 else self._canonical_gerrit_googlesource_host(host))
-        for host, (i1, i2) in self._get_git_gerrit_identity_pairs().iteritems()
+        for host, (i1, i2) in self._get_git_gerrit_identity_pairs().items()
         if None in (i1, i2) and host != '.' + self._GOOGLESOURCE)
 
   def get_conflicting_hosts(self):
     return set(
         host
-        for host, (i1, i2) in self._get_git_gerrit_identity_pairs().iteritems()
+        for host, (i1, i2) in self._get_git_gerrit_identity_pairs().items()
         if None not in (i1, i2) and i1 != i2)
 
   def get_duplicated_hosts(self):
     counters = collections.Counter(h for h, _, _ in self.get_hosts_with_creds())
-    return set(host for host, count in counters.iteritems() if count > 1)
+    return set(host for host, count in counters.items() if count > 1)
 
   _EXPECTED_HOST_IDENTITY_DOMAINS = {
     'chromium.googlesource.com': 'chromium.org',
@@ -3980,7 +3980,7 @@ class _GitCookiesChecker(object):
     Note: skips hosts which have conflicting identities for Git and Gerrit.
     """
     hosts = set()
-    for host, expected in self._EXPECTED_HOST_IDENTITY_DOMAINS.iteritems():
+    for host, expected in self._EXPECTED_HOST_IDENTITY_DOMAINS.items():
       pair = self._get_git_gerrit_identity_pairs().get(host)
       if pair and pair[0] == pair[1]:
         _, domain = self._parse_identity(pair[0])
@@ -3996,7 +3996,7 @@ class _GitCookiesChecker(object):
       extras = [''] * len(hosts)
     else:
       extras = [extra_column_func(host) for host in hosts]
-    tmpl = '%%-%ds    %%-%ds' % (max(map(len, hosts)), max(map(len, extras)))
+    tmpl = '%%-%ds    %%-%ds' % (max(list(map(len, hosts))), max(list(map(len, extras))))
     lines = []
     for he in zip(hosts, extras):
       lines.append(tmpl % he)
@@ -4121,7 +4121,7 @@ def CMDconfig(parser, args):
     url = os.path.join(url, 'codereview.settings')
 
   # Load code review settings and download hooks (if available).
-  LoadCodereviewSettingsFromFile(urllib2.urlopen(url))
+  LoadCodereviewSettingsFromFile(urllib.request.urlopen(url))
   return 0
 
 
@@ -4469,7 +4469,7 @@ def CMDstatus(parser, args):
   for cl in sorted(changes, key=lambda c: c.GetBranch()):
     branch = cl.GetBranch()
     while branch not in branch_statuses:
-      c, status = output.next()
+      c, status = next(output)
       branch_statuses[c.GetBranch()] = status
     status = branch_statuses.pop(branch)
     url = cl.GetIssueURL()
@@ -4553,7 +4553,7 @@ def CMDissue(parser, args):
       cl = Changelist(branchref=branch)
       issue_branch_map.setdefault(cl.GetIssue(), []).append(branch)
     if not args:
-      args = sorted(issue_branch_map.iterkeys())
+      args = sorted(issue_branch_map.keys())
     result = {}
     for issue in args:
       if not issue:
@@ -4644,7 +4644,7 @@ def CMDcomments(parser, args):
       dct['date'] = dct['date'].strftime('%Y-%m-%d %H:%M:%S.%f')
       return dct
     with open(options.json_file, 'wb') as f:
-      json.dump(map(pre_serialize, summary), f)
+      json.dump(list(map(pre_serialize, summary)), f)
   return 0
 
 
@@ -4928,7 +4928,7 @@ def cleanup_list(l):
   """
   items = sum((i.split(',') for i in l), [])
   stripped_items = (i.strip() for i in items)
-  return sorted(filter(None, stripped_items))
+  return sorted([_f for _f in stripped_items if _f])
 
 
 @subcommand.usage('[flags]')
@@ -5343,7 +5343,7 @@ def GetTreeStatus(url=None):
   'unknown' or 'unset'."""
   url = url or settings.GetTreeStatusUrl(error_ok=True)
   if url:
-    status = urllib2.urlopen(url).read().lower()
+    status = urllib.request.urlopen(url).read().lower()
     if status.find('closed') != -1 or status == '0':
       return 'closed'
     elif status.find('open') != -1 or status == '1':
@@ -5356,8 +5356,8 @@ def GetTreeStatusReason():
   """Fetches the tree status from a json url and returns the message
   with the reason for the tree to be opened or closed."""
   url = settings.GetTreeStatusUrl()
-  json_url = urlparse.urljoin(url, '/current?format=json')
-  connection = urllib2.urlopen(json_url)
+  json_url = urllib.parse.urljoin(url, '/current?format=json')
+  connection = urllib.request.urlopen(json_url)
   status = json.loads(connection.read())
   connection.close()
   return status['message']
@@ -5465,7 +5465,7 @@ def CMDtry(parser, args):
     print('Scheduling CQ dry run on: %s' % cl.GetIssueURL())
     return cl.SetCQState(_CQState.DRY_RUN)
 
-  for builders in buckets.itervalues():
+  for builders in buckets.values():
     if any('triggered' in b for b in builders):
       print('ERROR You are trying to send a job to a triggered bot. This type '
             'of bot requires an initial job from a parent (usually a builder). '
@@ -5962,7 +5962,7 @@ def CMDcheckout(parser, args):
         yield re.sub(r'branch\.(.*)\.%s' % issueprefix, r'\1', key)
 
   branches = []
-  for cls in _CODEREVIEW_IMPLEMENTATIONS.values():
+  for cls in list(_CODEREVIEW_IMPLEMENTATIONS.values()):
     branches.extend(find_issues(cls.IssueConfigKey()))
   if len(branches) == 0:
     print('No branch found for issue %s.' % target_issue)
@@ -5973,7 +5973,7 @@ def CMDcheckout(parser, args):
     print('Multiple branches match issue %s:' % target_issue)
     for i in range(len(branches)):
       print('%d: %s' % (i, branches[i]))
-    which = raw_input('Choose by index: ')
+    which = input('Choose by index: ')
     try:
       RunGit(['checkout', branches[int(which)]])
     except (IndexError, ValueError):
@@ -6028,7 +6028,7 @@ def main(argv):
     return dispatcher.execute(OptionParser(), argv)
   except auth.AuthenticationError as e:
     DieWithError(str(e))
-  except urllib2.HTTPError as e:
+  except urllib.error.HTTPError as e:
     if e.code != 500:
       raise
     DieWithError(

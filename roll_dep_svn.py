@@ -25,7 +25,7 @@ import os
 import re
 import sys
 
-from itertools import izip
+
 from subprocess import check_output, Popen, PIPE
 from textwrap import dedent
 
@@ -62,7 +62,7 @@ def find_gclient_root():
   """Find the directory containing the .gclient file."""
   cwd = posix_path(os.getcwd())
   result = ''
-  for _ in xrange(len(cwd.split('/'))):
+  for _ in range(len(cwd.split('/'))):
     if os.path.exists(os.path.join(result, '.gclient')):
       return result
     result = os.path.join(result, os.pardir)
@@ -76,7 +76,7 @@ def get_solution(gclient_root, dep_path):
   gclient_root = os.path.realpath(gclient_root)
   gclient_path = os.path.join(gclient_root, '.gclient')
   gclient_locals = {}
-  execfile(gclient_path, {}, gclient_locals)
+  exec(compile(open(gclient_path).read(), gclient_path, 'exec'), {}, gclient_locals)
   for soln in gclient_locals['solutions']:
     soln_relpath = platform_path(soln['name'].rstrip('/')) + os.sep
     if (dep_path.startswith(soln_relpath) or
@@ -134,8 +134,8 @@ def convert_svn_revision(dep_path, revision):
           try:
             svn_rev = int(line.split()[1].partition('@')[2])
           except (IndexError, ValueError):
-            print >> sys.stderr, (
-                'WARNING: Could not parse svn revision out of "%s"' % line)
+            print((
+                'WARNING: Could not parse svn revision out of "%s"' % line), file=sys.stderr)
             continue
           if not latest_svn_rev or int(svn_rev) > int(latest_svn_rev):
             latest_svn_rev = svn_rev
@@ -333,7 +333,7 @@ def update_deps(deps_file, dep_path, dep_name, new_rev, comment):
   def _Var(key):
     return deps_locals['vars'][key]
   deps_locals['Var'] = _Var
-  exec deps_content in {}, deps_locals
+  exec(deps_content, {}, deps_locals)
   deps_lines = deps_content.splitlines()
   deps_ast = ast.parse(deps_content, deps_file)
   deps_node = find_deps_section(deps_ast, 'deps')
@@ -346,7 +346,7 @@ def update_deps(deps_file, dep_path, dep_name, new_rev, comment):
                                          dep_name, new_rev)
   deps_os_node = find_deps_section(deps_ast, 'deps_os')
   if deps_os_node:
-    for (os_name, os_node) in izip(deps_os_node.keys, deps_os_node.values):
+    for (os_name, os_node) in zip(deps_os_node.keys, deps_os_node.values):
       dep_idx = find_dict_index(os_node, dep_name)
       if dep_idx is not None:
         value_node = os_node.values[dep_idx]
@@ -357,15 +357,15 @@ def update_deps(deps_file, dep_path, dep_name, new_rev, comment):
           commit_msg = generate_commit_message(
               deps_locals['deps_os'][os_name.s], dep_path, dep_name, new_rev)
   if not commit_msg:
-    print 'Could not find an entry in %s to update.' % deps_file
+    print('Could not find an entry in %s to update.' % deps_file)
     return 1
 
-  print 'Pinning %s' % dep_name
-  print 'to revision %s' % new_rev
-  print 'in %s' % deps_file
+  print('Pinning %s' % dep_name)
+  print('to revision %s' % new_rev)
+  print('in %s' % deps_file)
   with open(deps_file, 'w') as fh:
     for line in deps_lines:
-      print >> fh, line
+      print(line, file=fh)
   deps_file_dir = os.path.normpath(os.path.dirname(deps_file))
   deps_file_root = Popen(
       ['git', 'rev-parse', '--show-toplevel'],
@@ -396,7 +396,7 @@ def main(argv):
     # Only require the path to exist if the revision should be verified. A path
     # to e.g. os deps might not be checked out.
     if not os.path.isdir(dep_path):
-      print >> sys.stderr, 'No such directory: %s' % arg_dep_path
+      print('No such directory: %s' % arg_dep_path, file=sys.stderr)
       return 1
   if len(args) > 2:
     deps_file = args[2]
@@ -407,9 +407,9 @@ def main(argv):
   dep_name = posix_path(os.path.relpath(dep_path, gclient_root))
   if options.no_verify_revision:
     if not is_git_hash(revision):
-      print >> sys.stderr, (
+      print((
           'The passed revision %s must be a git hash when skipping revision '
-          'verification.' % revision)
+          'verification.' % revision), file=sys.stderr)
       return 1
     git_rev = revision
     comment = None
@@ -417,7 +417,7 @@ def main(argv):
     git_rev, svn_rev = get_git_revision(dep_path, revision)
     comment = ('from svn revision %s' % svn_rev) if svn_rev else None
     if not git_rev:
-      print >> sys.stderr, 'Could not find git revision matching %s.' % revision
+      print('Could not find git revision matching %s.' % revision, file=sys.stderr)
       return 1
   return update_deps(deps_file, dep_path, dep_name, git_rev, comment)
 

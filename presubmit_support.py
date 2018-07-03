@@ -14,9 +14,9 @@ __version__ = '1.8.0'
 
 import ast  # Exposed through the API.
 import contextlib
-import cPickle  # Exposed through the API.
+import pickle  # Exposed through the API.
 import cpplint
-import cStringIO  # Exposed through the API.
+import io  # Exposed through the API.
 import fnmatch  # Exposed through the API.
 import glob
 import inspect
@@ -38,8 +38,8 @@ import time
 import traceback  # Exposed through the API.
 import types
 import unittest  # Exposed through the API.
-import urllib2  # Exposed through the API.
-import urlparse
+import urllib.request, urllib.error, urllib.parse  # Exposed through the API.
+import urllib.parse
 from warnings import warn
 
 # Local imports.
@@ -374,7 +374,7 @@ class GerritAccessor(object):
 
     # Find revision info for the patchset we want.
     if patchset is not None:
-      for rev, rev_info in info['revisions'].iteritems():
+      for rev, rev_info in info['revisions'].items():
         if str(rev_info['_number']) == str(patchset):
           break
       else:
@@ -401,7 +401,7 @@ class GerritAccessor(object):
     changeinfo = self.GetChangeInfo(issue)
     if approving_only:
       labelinfo = changeinfo.get('labels', {}).get('Code-Review', {})
-      values = labelinfo.get('values', {}).keys()
+      values = list(labelinfo.get('values', {}).keys())
       try:
         max_value = max(int(v) for v in values)
         reviewers = [r for r in labelinfo.get('all', [])
@@ -627,9 +627,7 @@ class InputApi(object):
     if len(dir_with_slash) == 1:
       dir_with_slash = ''
 
-    return filter(
-        lambda x: normpath(x.AbsoluteLocalPath()).startswith(dir_with_slash),
-        self.change.AffectedFiles(include_deletes, file_filter))
+    return [x for x in self.change.AffectedFiles(include_deletes, file_filter) if normpath(x.AbsoluteLocalPath()).startswith(dir_with_slash)]
 
   def LocalPaths(self):
     """Returns local paths of input_api.AffectedFiles()."""
@@ -651,8 +649,7 @@ class InputApi(object):
                " is deprecated and ignored" % str(include_deletes),
            category=DeprecationWarning,
            stacklevel=2)
-    return filter(lambda x: x.IsTestableFile(),
-                  self.AffectedFiles(include_deletes=False, **kwargs))
+    return [x for x in self.AffectedFiles(include_deletes=False, **kwargs) if x.IsTestableFile()]
 
   def AffectedTextFiles(self, include_deletes=None):
     """An alias to AffectedTestableFiles for backwards compatibility."""
@@ -685,7 +682,7 @@ class InputApi(object):
     """
     if not source_file:
       source_file = self.FilterSourceFile
-    return filter(source_file, self.AffectedTestableFiles())
+    return list(filter(source_file, self.AffectedTestableFiles()))
 
   def RightHandSideLines(self, source_file_filter=None):
     """An iterator over all text lines in "new" version of changed files.
@@ -826,7 +823,7 @@ class _GitDiffCache(_DiffCache):
           current_diff.append(x)
 
       self._diffs_by_file = dict(
-        (normpath(path), ''.join(diff)) for path, diff in diffs.items())
+        (normpath(path), ''.join(diff)) for path, diff in list(diffs.items()))
 
     if path not in self._diffs_by_file:
       raise PresubmitFailure(
@@ -1106,11 +1103,11 @@ class Change(object):
     Returns:
       [AffectedFile(path, action), AffectedFile(path, action)]
     """
-    affected = filter(file_filter, self._affected_files)
+    affected = list(filter(file_filter, self._affected_files))
 
     if include_deletes:
       return affected
-    return filter(lambda x: x.Action() != 'D', affected)
+    return [x for x in affected if x.Action() != 'D']
 
   def AffectedTestableFiles(self, include_deletes=None, **kwargs):
     """Return a list of the existing text files in a change."""
@@ -1119,8 +1116,7 @@ class Change(object):
                " is deprecated and ignored" % str(include_deletes),
            category=DeprecationWarning,
            stacklevel=2)
-    return filter(lambda x: x.IsTestableFile(),
-                  self.AffectedFiles(include_deletes=False, **kwargs))
+    return [x for x in self.AffectedFiles(include_deletes=False, **kwargs) if x.IsTestableFile()]
 
   def AffectedTextFiles(self, include_deletes=None):
     """An alias to AffectedTestableFiles for backwards compatibility."""
@@ -1240,8 +1236,8 @@ class GetTryMastersExecuter(object):
     """
     context = {}
     try:
-      exec script_text in context
-    except Exception, e:
+      exec(script_text, context)
+    except Exception as e:
       raise PresubmitFailure('"%s" had an exception.\n%s'
                              % (presubmit_path, e))
 
@@ -1271,8 +1267,8 @@ class GetPostUploadExecuter(object):
     """
     context = {}
     try:
-      exec script_text in context
-    except Exception, e:
+      exec(script_text, context)
+    except Exception as e:
       raise PresubmitFailure('"%s" had an exception.\n%s'
                              % (presubmit_path, e))
 
@@ -1289,10 +1285,10 @@ class GetPostUploadExecuter(object):
 def _MergeMasters(masters1, masters2):
   """Merges two master maps. Merges also the tests of each builder."""
   result = {}
-  for (master, builders) in itertools.chain(masters1.iteritems(),
-                                            masters2.iteritems()):
+  for (master, builders) in itertools.chain(iter(masters1.items()),
+                                            iter(masters2.items())):
     new_builders = result.setdefault(master, {})
-    for (builder, tests) in builders.iteritems():
+    for (builder, tests) in builders.items():
       new_builders.setdefault(builder, set([])).update(tests)
   return result
 
@@ -1339,7 +1335,7 @@ def DoGetTryMasters(change,
         presubmit_script, filename, project, change))
 
   # Make sets to lists again for later JSON serialization.
-  for builders in results.itervalues():
+  for builders in results.values():
     for builder in builders:
       builders[builder] = list(builders[builder])
 
@@ -1436,8 +1432,8 @@ class PresubmitExecuter(object):
     output_api = OutputApi(self.committing)
     context = {}
     try:
-      exec script_text in context
-    except Exception, e:
+      exec(script_text, context)
+    except Exception as e:
       raise PresubmitFailure('"%s" had an exception.\n%s' % (presubmit_path, e))
 
     # These function names must change if we make substantial changes to
@@ -1454,9 +1450,9 @@ class PresubmitExecuter(object):
         logging.debug('Running %s done.', function_name)
         self.more_cc.extend(output_api.more_cc)
       finally:
-        map(os.remove, input_api._named_temporary_files)
-      if not (isinstance(result, types.TupleType) or
-              isinstance(result, types.ListType)):
+        list(map(os.remove, input_api._named_temporary_files))
+      if not (isinstance(result, tuple) or
+              isinstance(result, list)):
         raise PresubmitFailure(
           'Presubmit functions must return a tuple or list')
       for item in result:
@@ -1650,7 +1646,7 @@ def canned_check_filter(method_names):
       setattr(presubmit_canned_checks, method_name, lambda *_a, **_kw: [])
     yield
   finally:
-    for name, method in filtered.iteritems():
+    for name, method in filtered.items():
       setattr(presubmit_canned_checks, name, method)
 
 
@@ -1710,7 +1706,7 @@ def main(argv=None):
   gerrit_obj = None
   if options.gerrit_url and options.gerrit_fetch:
     assert options.issue and options.patchset
-    gerrit_obj = GerritAccessor(urlparse.urlparse(options.gerrit_url).netloc)
+    gerrit_obj = GerritAccessor(urllib.parse.urlparse(options.gerrit_url).netloc)
     options.author = gerrit_obj.GetChangeOwner(options.issue)
     options.description = gerrit_obj.GetChangeDescription(options.issue,
                                                           options.patchset)
@@ -1738,9 +1734,9 @@ def main(argv=None):
           options.dry_run,
           options.parallel)
     return not results.should_continue()
-  except PresubmitFailure, e:
-    print >> sys.stderr, e
-    print >> sys.stderr, 'Maybe your depot_tools is out of date?'
+  except PresubmitFailure as e:
+    print(e, file=sys.stderr)
+    print('Maybe your depot_tools is out of date?', file=sys.stderr)
     return 2
 
 

@@ -26,7 +26,7 @@ def main(args):
   dispatcher = subcommand.CommandDispatcher(__name__)
   ret = dispatcher.execute(optparse.OptionParser(), args)
   if ret:
-    print ret
+    print(ret)
   return 0
 
 

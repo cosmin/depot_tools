@@ -5,7 +5,7 @@
 """git drover: A tool for merging changes to release branches."""
 
 import argparse
-import cPickle
+import pickle
 import functools
 import logging
 import os
@@ -113,10 +113,10 @@ class _Drover(object):
     """
     try:
       with open(os.path.join(workdir, '.git', 'drover'), 'rb') as f:
-        drover = cPickle.load(f)
+        drover = pickle.load(f)
         drover._process_options()
         return drover
-    except (IOError, cPickle.UnpicklingError):
+    except (IOError, pickle.UnpicklingError):
       raise Error('%r is not git drover workdir' % workdir)
 
   def _continue(self):
@@ -181,7 +181,7 @@ class _Drover(object):
     result = ''
     while result not in ('y', 'n'):
       try:
-        result = raw_input('%s Continue (y/n)? ' % message)
+        result = input('%s Continue (y/n)? ' % message)
       except EOFError:
         result = 'n'
     return result == 'y'
@@ -255,7 +255,7 @@ class _Drover(object):
   def _save_state(self):
     """Saves the state of this Drover instances to the workdir."""
     with open(os.path.join(self._workdir, '.git', 'drover'), 'wb') as f:
-      cPickle.dump(self, f)
+      pickle.dump(self, f)
 
   def _prepare_manual_resolve(self):
     """Prepare the workdir for the user to manually resolve the cherry-pick."""
@@ -452,7 +452,7 @@ def main():
                          options.parent_checkout, options.dry_run,
                          options.verbose)
   except Error as e:
-    print 'Error:', e.message
+    print('Error:', e.message)
     sys.exit(128)
 
 

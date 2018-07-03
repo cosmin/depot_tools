@@ -21,12 +21,12 @@ import logging
 import re
 import socket
 import ssl
-import StringIO
+import io
 import sys
 import time
-import urllib
-import urllib2
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
+import urllib.parse
 
 import patch
 
@@ -94,7 +94,7 @@ class Rietveld(object):
     resp = None
     try:
       resp = json.loads(self.get(url))
-    except (urllib2.HTTPError, ValueError):
+    except (urllib.error.HTTPError, ValueError):
       # The get_depends_on_patchset endpoint does not exist on this Rietveld
       # instance yet. Ignore the error and proceed.
       # TODO(rmistry): Make this an error when all Rietveld instances have
@@ -129,7 +129,7 @@ class Rietveld(object):
     """Returns a PatchSet object containing the details to apply this patch."""
     props = self.get_patchset_properties(issue, patchset) or {}
     out = []
-    for filename, state in props.get('files', {}).iteritems():
+    for filename, state in props.get('files', {}).items():
       logging.debug('%s' % filename)
       # If not status, just assume it's a 'M'. Rietveld often gets it wrong and
       # just has status: null. Oh well.
@@ -165,7 +165,7 @@ class Rietveld(object):
 
       try:
         diff = self.get_file_diff(issue, patchset, state['id'])
-      except urllib2.HTTPError, e:
+      except urllib.error.HTTPError as e:
         if e.code == 404:
           raise patch.UnsupportedPatchFormat(
               filename, 'File doesn\'t have a diff.')
@@ -282,7 +282,7 @@ class Rietveld(object):
     return self.post('/%d/edit_flags' % issue, [
         ('last_patchset', str(patchset)),
         ('xsrf_token', self.xsrf_token()),
-        ] + [(flag, str(value)) for flag, value in flags.iteritems()])
+        ] + [(flag, str(value)) for flag, value in flags.items()])
 
   def search(
       self,
@@ -323,7 +323,7 @@ class Rietveld(object):
     for key in sorted(string_keys):
       value = string_keys[key]
       if value:
-        url += '&%s=%s' % (key, urllib2.quote(value))
+        url += '&%s=%s' % (key, urllib.parse.quote(value))
     for key in sorted(three_state_keys):
       value = three_state_keys[key]
       if value is not None:
@@ -384,7 +384,7 @@ class Rietveld(object):
     |masters| is a map of masters: map of builders: [tests] to run.
     |category| is used to distinguish regular jobs and experimental jobs.
     """
-    for (master, builders_and_tests) in masters.iteritems():
+    for (master, builders_and_tests) in masters.items():
       self.trigger_try_jobs(
           issue, patchset, reason, clobber, revision, builders_and_tests,
           master, category)
@@ -422,16 +422,16 @@ class Rietveld(object):
         m = re.search(r'(50\d) Server Error', msg)
         if m:
           # Fake an HTTPError exception. Cheezy. :(
-          raise urllib2.HTTPError(
-              request_path, int(m.group(1)), msg, None, StringIO.StringIO())
+          raise urllib.error.HTTPError(
+              request_path, int(m.group(1)), msg, None, io.StringIO())
         old_error_exit(msg)
       upload.ErrorExit = trap_http_500
 
-      for retry in xrange(self._maxtries):
+      for retry in range(self._maxtries):
         try:
           logging.debug('%s' % request_path)
           return self.rpc_server.Send(request_path, **kwargs)
-        except urllib2.HTTPError, e:
+        except urllib.error.HTTPError as e:
           if retry >= (self._maxtries - 1):
             raise
           flake_codes = {500, 502, 503}
@@ -439,7 +439,7 @@ class Rietveld(object):
             flake_codes.add(404)
           if e.code not in flake_codes:
             raise
-        except urllib2.URLError, e:
+        except urllib.error.URLError as e:
           if retry >= (self._maxtries - 1):
             raise
 
@@ -466,15 +466,15 @@ class Rietveld(object):
             logging.error('Caught urllib2.URLError %s which wasn\'t deemed '
                           'transient', e.reason)
             raise
-        except socket.error, e:
+        except socket.error as e:
           if retry >= (self._maxtries - 1):
             raise
           if not 'timed out' in str(e):
             raise
         # If reaching this line, loop again. Uses a small backoff.
         time.sleep(min(10, 1+retry*2))
-    except urllib2.HTTPError as e:
-      print 'Request to %s failed: %s' % (e.geturl(), e.read())
+    except urllib.error.HTTPError as e:
+      print('Request to %s failed: %s' % (e.geturl(), e.read()))
       raise
     finally:
       upload.ErrorExit = old_error_exit
@@ -500,7 +500,7 @@ class OAuthRpcServer(object):
     """
 
     # Enforce https
-    host_parts = urlparse.urlparse(host)
+    host_parts = urllib.parse.urlparse(host)
 
     if host_parts.scheme == 'https':  # fine
       self.host = host
@@ -567,7 +567,7 @@ class OAuthRpcServer(object):
         self._http.timeout = timeout
       url = self.host + request_path
       if kwargs:
-        url += "?" + urllib.urlencode(kwargs)
+        url += "?" + urllib.parse.urlencode(kwargs)
 
       # This weird loop is there to detect when the OAuth2 token has expired.
       # This is specific to appengine *and* rietveld. It relies on the
@@ -594,9 +594,9 @@ class OAuthRpcServer(object):
         break
 
       if ret[0].status >= 300:
-        raise urllib2.HTTPError(
+        raise urllib.error.HTTPError(
             request_path, int(ret[0]['status']), ret[1], None,
-            StringIO.StringIO())
+            io.StringIO())
 
       return ret[1]
 
@@ -763,7 +763,7 @@ class ReadOnlyRietveld(object):
     ReadOnlyRietveld._local_changes.setdefault(issue, {})[flag] = value
 
   def set_flags(self, issue, patchset, flags):
-    for flag, value in flags.iteritems():
+    for flag, value in flags.items():
       self.set_flag(issue, patchset, flag, value)
 
   def trigger_try_jobs(  # pylint:disable=no-self-use

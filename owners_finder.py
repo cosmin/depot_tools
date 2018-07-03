@@ -120,7 +120,7 @@ class OwnersFinder(object):
           self.list_owners(self.owners_queue)
           break
         elif inp == 'p' or inp == 'pick':
-          self.pick_owner(raw_input('Pick an owner: '))
+          self.pick_owner(input('Pick an owner: '))
           break
         elif inp.startswith('p ') or inp.startswith('pick '):
           self.pick_owner(inp.split(' ', 2)[1].strip())
@@ -157,7 +157,7 @@ class OwnersFinder(object):
     self.deselected_owners = set()
 
     # Initialize owners queue, sort it by the score
-    self.owners_queue = list(sorted(self.owners_to_files.keys(),
+    self.owners_queue = list(sorted(list(self.owners_to_files.keys()),
                                     key=lambda owner: self.owners_score[owner]))
     self.find_mandatory_owners()
 
@@ -168,9 +168,7 @@ class OwnersFinder(object):
     self.writeln('Selected: ' + owner)
     self.owners_queue.remove(owner)
     self.selected_owners.add(owner)
-    for file_name in filter(
-        lambda file_name: file_name in self.unreviewed_files,
-        self.owners_to_files[owner]):
+    for file_name in [file_name for file_name in self.owners_to_files[owner] if file_name in self.unreviewed_files]:
       self.unreviewed_files.remove(file_name)
       self.reviewed_by[file_name] = owner
     if findMandatoryOwners:
@@ -200,9 +198,7 @@ class OwnersFinder(object):
 
     while continues:
       continues = False
-      for file_name in filter(
-          lambda file_name: len(self.files_to_owners[file_name]) == 1,
-          self.unreviewed_files):
+      for file_name in [file_name for file_name in self.unreviewed_files if len(self.files_to_owners[file_name]) == 1]:
         owner = first(self.files_to_owners[file_name])
         self.select_owner(owner, False)
         continues = True
@@ -351,7 +347,7 @@ class OwnersFinder(object):
     return '  ' * self.indentation
 
   def writeln(self, text=''):
-    print self.print_indent() + text
+    print(self.print_indent() + text)
 
   def hr(self):
     self.writeln('=====================')
@@ -364,5 +360,5 @@ class OwnersFinder(object):
 
   def input_command(self, owner):
     self.writeln('Add ' + self.bold_name(owner) + ' as your reviewer? ')
-    return raw_input(
+    return input(
         '[yes/no/Defer/pick/files/owners/quit/restart]: ').lower()

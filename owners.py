@@ -73,7 +73,7 @@ GLOBAL_STATUS = '*'
 
 
 def _assert_is_collection(obj):
-  assert not isinstance(obj, basestring)
+  assert not isinstance(obj, str)
   # Module 'collections' has no 'Iterable' member
   # pylint: disable=no-member
   if hasattr(collections, 'Iterable') and hasattr(collections, 'Sized'):
@@ -223,7 +223,7 @@ class Database(object):
 
   def _owners_for(self, objname):
     obj_owners = set()
-    for owned_path, path_owners in self._paths_to_owners.iteritems():
+    for owned_path, path_owners in self._paths_to_owners.items():
       if self._fnmatch(objname, owned_path):
         obj_owners |= path_owners
     return obj_owners
@@ -438,7 +438,7 @@ class Database(object):
       # Now that we've used `owner` and covered all their dirs, remove them
       # from consideration.
       del all_possible_owners[owner]
-      for o, dirs in all_possible_owners.items():
+      for o, dirs in list(all_possible_owners.items()):
         new_dirs = [(d, dist) for (d, dist) in dirs if d not in dirs_to_remove]
         if not new_dirs:
           del all_possible_owners[o]
@@ -504,8 +504,6 @@ class Database(object):
     total_costs_by_owner = Database.total_costs_by_owner(all_possible_owners,
                                                          dirs)
     # Return the lowest cost owner. In the case of a tie, pick one randomly.
-    lowest_cost = min(total_costs_by_owner.itervalues())
-    lowest_cost_owners = filter(
-        lambda owner: total_costs_by_owner[owner] == lowest_cost,
-        total_costs_by_owner)
+    lowest_cost = min(total_costs_by_owner.values())
+    lowest_cost_owners = [owner for owner in total_costs_by_owner if total_costs_by_owner[owner] == lowest_cost]
     return random.Random().choice(lowest_cost_owners)

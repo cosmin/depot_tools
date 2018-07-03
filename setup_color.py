@@ -90,5 +90,5 @@ def init():
 
 if __name__ == '__main__':
   init()
-  print 'IS_TTY:', IS_TTY
-  print 'OUT_TYPE:', OUT_TYPE
+  print('IS_TTY:', IS_TTY)
+  print('OUT_TYPE:', OUT_TYPE)

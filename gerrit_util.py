@@ -10,8 +10,8 @@ https://gerrit-review.googlesource.com/Documentation/rest-api.html
 
 import base64
 import contextlib
-import cookielib
-import httplib  # Still used for its constants.
+import http.cookiejar
+import http.client  # Still used for its constants.
 import json
 import logging
 import netrc
@@ -22,9 +22,9 @@ import stat
 import sys
 import tempfile
 import time
-import urllib
-import urlparse
-from cStringIO import StringIO
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
+from io import StringIO
 
 import auth
 import gclient_utils
@@ -59,7 +59,7 @@ def _QueryString(params, first_param=None):
 
   https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html#list-changes
   """
-  q = [urllib.quote(first_param)] if first_param else []
+  q = [urllib.parse.quote(first_param)] if first_param else []
   q.extend(['%s:%s' % (key, val) for key, val in params])
   return '+'.join(q)
 
@@ -138,10 +138,10 @@ class CookiesAuthenticator(Authenticator):
     if os.path.exists(path):
       st = os.stat(path)
       if st.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
-        print >> sys.stderr, (
+        print((
             'WARNING: netrc file %s cannot be used because its file '
             'permissions are insecure.  netrc file permissions should be '
-            '600.' % path)
+            '600.' % path), file=sys.stderr)
       with open(path) as fd:
         content = fd.read()
 
@@ -161,11 +161,11 @@ class CookiesAuthenticator(Authenticator):
     try:
       return netrc.netrc(path)
     except IOError:
-      print >> sys.stderr, 'WARNING: Could not read netrc file %s' % path
+      print('WARNING: Could not read netrc file %s' % path, file=sys.stderr)
       return netrc.netrc(os.devnull)
     except netrc.NetrcParseError as e:
-      print >> sys.stderr, ('ERROR: Cannot use netrc file %s due to a '
-                            'parsing error: %s' % (path, e))
+      print(('ERROR: Cannot use netrc file %s due to a '
+                            'parsing error: %s' % (path, e)), file=sys.stderr)
       return netrc.netrc(os.devnull)
 
   @classmethod
@@ -206,8 +206,8 @@ class CookiesAuthenticator(Authenticator):
     return gitcookies
 
   def _get_auth_for_host(self, host):
-    for domain, creds in self.gitcookies.iteritems():
-      if cookielib.domain_match(host, domain):
+    for domain, creds in self.gitcookies.items():
+      if http.cookiejar.domain_match(host, domain):
         return (creds[0], None, creds[1])
     return self.netrc.authenticators(host)
 
@@ -270,12 +270,12 @@ class GceAuthenticator(Authenticator):
   @staticmethod
   def _get(url, **kwargs):
     next_delay_sec = 1
-    for i in xrange(TRY_LIMIT):
-      p = urlparse.urlparse(url)
+    for i in range(TRY_LIMIT):
+      p = urllib.parse.urlparse(url)
       c = GetConnectionObject(protocol=p.scheme)
       resp, contents = c.request(url, 'GET', **kwargs)
       LOGGER.debug('GET [%s] #%d/%d (%d)', url, i+1, TRY_LIMIT, resp.status)
-      if resp.status < httplib.INTERNAL_SERVER_ERROR:
+      if resp.status < http.client.INTERNAL_SERVER_ERROR:
         return (resp, contents)
 
       # Retry server error status codes.
@@ -295,7 +295,7 @@ class GceAuthenticator(Authenticator):
         return cls._token_cache
 
     resp, contents = cls._get(cls._ACQUIRE_URL, headers=cls._ACQUIRE_HEADERS)
-    if resp.status != httplib.OK:
+    if resp.status != http.client.OK:
       return None
     cls._token_cache = json.loads(contents)
     cls._token_expiration = cls._token_cache['expires_in'] + time.time()
@@ -352,7 +352,7 @@ def CreateHttpConn(host, path, reqtype='GET', headers=None, body=None):
     headers.setdefault('Content-Type', 'application/json')
   if LOGGER.isEnabledFor(logging.DEBUG):
     LOGGER.debug('%s %s://%s%s' % (reqtype, GERRIT_PROTOCOL, host, url))
-    for key, val in headers.iteritems():
+    for key, val in headers.items():
       if key == 'Authorization':
         val = 'HIDDEN'
       LOGGER.debug('%s: %s' % (key, val))
@@ -361,7 +361,7 @@ def CreateHttpConn(host, path, reqtype='GET', headers=None, body=None):
   conn = GetConnectionObject()
   conn.req_host = host
   conn.req_params = {
-      'uri': urlparse.urljoin('%s://%s' % (GERRIT_PROTOCOL, host), url),
+      'uri': urllib.parse.urljoin('%s://%s' % (GERRIT_PROTOCOL, host), url),
       'method': reqtype,
       'headers': headers,
       'body': body,
@@ -384,7 +384,7 @@ def ReadHttpResponse(conn, accept_statuses=frozenset([200])):
 
     # Check if this is an authentication issue.
     www_authenticate = response.get('www-authenticate')
-    if (response.status in (httplib.UNAUTHORIZED, httplib.FOUND) and
+    if (response.status in (http.client.UNAUTHORIZED, http.client.FOUND) and
         www_authenticate):
       auth_match = re.search('realm="([^"]+)"', www_authenticate, re.I)
       host = auth_match.group(1) if auth_match else conn.req_host
@@ -539,7 +539,7 @@ def MultiQueryChanges(host, params, change_list, limit=None, o_params=None,
   if not change_list:
     raise RuntimeError(
         "MultiQueryChanges requires a list of change numbers/id's")
-  q = ['q=%s' % '+OR+'.join([urllib.quote(str(x)) for x in change_list])]
+  q = ['q=%s' % '+OR+'.join([urllib.parse.quote(str(x)) for x in change_list])]
   if params:
     q.append(_QueryString(params))
   if limit:
@@ -722,7 +722,7 @@ def AddReviewers(host, change, reviewers=None, ccs=None, notify=True,
   resp = ReadHttpJsonResponse(conn, accept_statuses=accept_statuses)
 
   errored = set()
-  for result in resp.get('reviewers', {}).itervalues():
+  for result in resp.get('reviewers', {}).values():
     r = result.get('input')
     state = 'REVIEWER' if r in reviewers else 'CC'
     if result.get('error'):
@@ -738,7 +738,7 @@ def RemoveReviewers(host, change, remove=None):
   """Remove reveiewers from a change."""
   if not remove:
     return
-  if isinstance(remove, basestring):
+  if isinstance(remove, str):
     remove = (remove,)
   for r in remove:
     path = 'changes/%s/reviewers/%s' % (change, r)
@@ -769,7 +769,7 @@ def SetReview(host, change, msg=None, labels=None, notify=None, ready=None):
   conn = CreateHttpConn(host, path, reqtype='POST', body=body)
   response = ReadHttpJsonResponse(conn)
   if labels:
-    for key, val in labels.iteritems():
+    for key, val in labels.items():
       if ('labels' not in response or key not in response['labels'] or
           int(response['labels'][key] != int(val))):
         raise GerritError(200, 'Unable to set "%s" label on change %s.' % (

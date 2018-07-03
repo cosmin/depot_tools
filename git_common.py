@@ -11,7 +11,7 @@ def wrapper(func):
     return func(self, timeout=timeout or 1e100)
   return wrap
 IMapIterator.next = wrapper(IMapIterator.next)
-IMapIterator.__next__ = IMapIterator.next
+IMapIterator.__next__ = IMapIterator.__next__
 # TODO(iannucci): Monkeypatch all other 'wait' methods too.
 
 
@@ -32,7 +32,7 @@ import threading
 
 import subprocess2
 
-from StringIO import StringIO
+from io import StringIO
 
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
@@ -304,13 +304,13 @@ def once(function):
     yield function()
     while True:
       yield
-  return _inner_gen().next
+  return _inner_gen().__next__
 
 
 ## Git functions
 
 def die(message, *args):
-  print >> sys.stderr, textwrap.dedent(message % args)
+  print(textwrap.dedent(message % args), file=sys.stderr)
   sys.exit(1)
 
 
@@ -594,7 +594,7 @@ def mktree(treedict):
     treedict - { name: (mode, type, ref) }
   """
   with tempfile.TemporaryFile() as f:
-    for name, (mode, typ, ref) in treedict.iteritems():
+    for name, (mode, typ, ref) in treedict.items():
       f.write('%s %s %s\t%s\0' % (mode, typ, ref, name))
     f.seek(0)
     return run('mktree', '-z', stdin=f)
@@ -609,7 +609,7 @@ def parse_commitrefs(*commitrefs):
     * 'cool_branch~2'
   """
   try:
-    return map(binascii.unhexlify, hash_multi(*commitrefs))
+    return list(map(binascii.unhexlify, hash_multi(*commitrefs)))
   except subprocess2.CalledProcessError:
     raise BadCommitRefException(commitrefs)
 
@@ -843,7 +843,7 @@ def squash_current_branch(header=None, merge_base=None):
   if not get_dirty_files():
     # Sometimes the squash can result in the same tree, meaning that there is
     # nothing to commit at this point.
-    print 'Nothing to commit; squashed branch is empty'
+    print('Nothing to commit; squashed branch is empty')
     return False
   run('commit', '--no-verify', '-a', '-F', '-', indata=log_msg)
   return True
@@ -855,7 +855,7 @@ def tags(*args):
 
 def thaw():
   took_action = False
-  for sha in (s.strip() for s in run_stream('rev-list', 'HEAD').xreadlines()):
+  for sha in (s.strip() for s in run_stream('rev-list', 'HEAD')):
     msg = run('show', '--format=%f%b', '-s', 'HEAD')
     match = FREEZE_MATCHER.match(msg)
     if not match:
@@ -896,7 +896,7 @@ def topo_iter(branch_tree, top_down=True):
   # TODO(iannucci): There is probably a more efficient way to do these.
   if top_down:
     while branch_tree:
-      this_pass = [(b, p) for b, p in branch_tree.iteritems()
+      this_pass = [(b, p) for b, p in branch_tree.items()
                    if p not in branch_tree]
       assert this_pass, "Branch tree has cycles: %r" % branch_tree
       for branch, parent in sorted(this_pass):
@@ -904,11 +904,11 @@ def topo_iter(branch_tree, top_down=True):
         del branch_tree[branch]
   else:
     parent_to_branches = collections.defaultdict(set)
-    for branch, parent in branch_tree.iteritems():
+    for branch, parent in branch_tree.items():
       parent_to_branches[parent].add(branch)
 
     while branch_tree:
-      this_pass = [(b, p) for b, p in branch_tree.iteritems()
+      this_pass = [(b, p) for b, p in branch_tree.items()
                    if not parent_to_branches[b]]
       assert this_pass, "Branch tree has cycles: %r" % branch_tree
       for branch, parent in sorted(this_pass):
@@ -1007,11 +1007,11 @@ def get_branches_info(include_tracking_status):
   # Set None for upstreams which are not branches (e.g empty upstream, remotes
   # and deleted upstream branches).
   missing_upstreams = {}
-  for info in info_map.values():
+  for info in list(info_map.values()):
     if info.upstream not in info_map and info.upstream not in missing_upstreams:
       missing_upstreams[info.upstream] = None
 
-  return dict(info_map.items() + missing_upstreams.items())
+  return dict(list(info_map.items()) + list(missing_upstreams.items()))
 
 
 def make_workdir_common(repository, new_workdir, files_to_symlink,

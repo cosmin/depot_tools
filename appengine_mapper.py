@@ -4,7 +4,7 @@
 
 """Ensures that all depot_tools talks directly to appengine to avoid SNI."""
 
-import urlparse
+import urllib.parse
 
 
 mapping = {
@@ -16,8 +16,8 @@ mapping = {
 
 
 def MapUrl(url):
-  parts = list(urlparse.urlsplit(url))
+  parts = list(urllib.parse.urlsplit(url))
   new_netloc = mapping.get(parts[1])
   if new_netloc:
     parts[1] = new_netloc
-  return urlparse.urlunsplit(parts)
+  return urllib.parse.urlunsplit(parts)

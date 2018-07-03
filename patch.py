@@ -226,7 +226,7 @@ class FilePatchDiff(FilePatchBase):
     # Mangle any \\ in the header to /.
     header_lines = ('Index:', 'diff', 'copy', 'rename', '+++', '---')
     basename = os.path.basename(self.filename_utf8)
-    for i in xrange(len(header)):
+    for i in range(len(header)):
       if (header[i].split(' ', 1)[0] in header_lines or
           header[i].endswith(basename)):
         header[i] = header[i].replace('\\', '/')
@@ -260,7 +260,7 @@ class FilePatchDiff(FilePatchBase):
           start_src = int(match.group(1))
           lines_src = 1
         elif count == 1:
-          start_src, lines_src = map(int, match.group(1).split(',', 1))
+          start_src, lines_src = list(map(int, match.group(1).split(',', 1)))
         else:
           self._fail('Hunk header is malformed')
 
@@ -269,7 +269,7 @@ class FilePatchDiff(FilePatchBase):
           start_dst = int(match.group(2))
           lines_dst = 1
         elif count == 1:
-          start_dst, lines_dst = map(int, match.group(2).split(',', 1))
+          start_dst, lines_dst = list(map(int, match.group(2).split(',', 1)))
         else:
           self._fail('Hunk header is malformed')
         new_hunk = Hunk(start_src, lines_src, start_dst, lines_dst)

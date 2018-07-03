@@ -4,7 +4,7 @@
 
 """Google OAuth2 related functions."""
 
-import BaseHTTPServer
+import http.server
 import collections
 import datetime
 import functools
@@ -17,8 +17,8 @@ import socket
 import sys
 import threading
 import time
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 import webbrowser
 
 from third_party import httplib2
@@ -403,7 +403,7 @@ def get_authenticator_for_host(hostname, config, scopes=OAUTH_SCOPE_EMAIL):
   # Append some scheme, otherwise urlparse puts hostname into parsed.path.
   if '://' not in hostname:
     hostname = 'https://' + hostname
-  parsed = urlparse.urlparse(hostname)
+  parsed = urllib.parse.urlparse(hostname)
 
   if parsed.path or parsed.params or parsed.query or parsed.fragment:
     raise AuthenticationError(
@@ -506,7 +506,7 @@ class Authenticator(object):
         return self._access_token
       except LuciContextAuthError:
         logging.exception('Failed to use local auth')
-        raise exi[0], exi[1], exi[2]
+        raise exi[0](exi[1]).with_traceback(exi[2])
 
     with self._lock:
       if force_refresh:
@@ -540,7 +540,7 @@ class Authenticator(object):
     access_token = self.get_access_token()
     resp, content = httplib2.Http().request(
         uri='https://www.googleapis.com/oauth2/v2/tokeninfo?%s' % (
-            urllib.urlencode({'access_token': access_token.token})))
+            urllib.parse.urlencode({'access_token': access_token.token})))
     if resp.status == 200:
       return json.loads(content)
     raise AuthenticationError('Failed to fetch the token info: %r' % content)
@@ -787,12 +787,12 @@ def _run_oauth_dance(config, scopes):
       success = True
     use_local_webserver = success
     if not success:
-      print(
+      print((
         'Failed to start a local webserver listening on port %d.\n'
         'Please check your firewall settings and locally running programs that '
         'may be blocking or using those ports.\n\n'
         'Falling back to --auth-no-local-webserver and continuing with '
-        'authentication.\n' % port)
+        'authentication.\n' % port))
 
   if use_local_webserver:
     oauth_callback = 'http://localhost:%s/' % port
@@ -803,16 +803,16 @@ def _run_oauth_dance(config, scopes):
 
   if use_local_webserver:
     webbrowser.open(authorize_url, new=1, autoraise=True)
-    print(
+    print((
       'Your browser has been opened to visit:\n\n'
       '    %s\n\n'
       'If your browser is on a different machine then exit and re-run this '
       'application with the command-line parameter\n\n'
-      '  --auth-no-local-webserver\n' % authorize_url)
+      '  --auth-no-local-webserver\n' % authorize_url))
   else:
-    print(
+    print((
       'Go to the following link in your browser:\n\n'
-      '    %s\n' % authorize_url)
+      '    %s\n' % authorize_url))
 
   try:
     code = None
@@ -828,7 +828,7 @@ def _run_oauth_dance(config, scopes):
             'Try running with --auth-no-local-webserver.')
       code = httpd.query_params['code']
     else:
-      code = raw_input('Enter verification code: ').strip()
+      code = input('Enter verification code: ').strip()
   except KeyboardInterrupt:
     raise AuthenticationError('Authentication was canceled.')
 
@@ -838,7 +838,7 @@ def _run_oauth_dance(config, scopes):
     raise AuthenticationError('Authentication has failed: %s' % e)
 
 
-class _ClientRedirectServer(BaseHTTPServer.HTTPServer):
+class _ClientRedirectServer(http.server.HTTPServer):
   """A server to handle OAuth 2.0 redirects back to localhost.
 
   Waits for a single request and parses the query parameters
@@ -847,7 +847,7 @@ class _ClientRedirectServer(BaseHTTPServer.HTTPServer):
   query_params = {}
 
 
-class _ClientRedirectHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class _ClientRedirectHandler(http.server.BaseHTTPRequestHandler):
   """A handler for OAuth 2.0 redirects back to localhost.
 
   Waits for a single request and parses the query parameters
@@ -865,7 +865,7 @@ class _ClientRedirectHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_header('Content-type', 'text/html')
     self.end_headers()
     query = self.path.split('?', 1)[-1]
-    query = dict(urlparse.parse_qsl(query))
+    query = dict(urllib.parse.parse_qsl(query))
     self.server.query_params = query
     self.wfile.write('<html><head><title>Authentication Status</title></head>')
     self.wfile.write('<body><p>The authentication flow has completed.</p>')

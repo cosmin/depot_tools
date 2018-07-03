@@ -130,7 +130,7 @@ class BranchMapper(object):
       from git_cl import get_cl_statuses, color_for_status, Changelist
 
       change_cls = [Changelist(branchref='refs/heads/'+b)
-                    for b in self.__branches_info.keys() if b]
+                    for b in list(self.__branches_info.keys()) if b]
       status_info = get_cl_statuses(change_cls,
                                     fine_grained=self.verbosity > 2,
                                     max_processes=self.maxjobs)
@@ -145,7 +145,7 @@ class BranchMapper(object):
     roots = set()
 
     # A map of parents to a list of their children.
-    for branch, branch_info in self.__branches_info.iteritems():
+    for branch, branch_info in self.__branches_info.items():
       if not branch_info:
         continue
 
@@ -296,11 +296,11 @@ def print_desc():
 def main(argv):
   setup_color.init()
   if get_git_version() < MIN_UPSTREAM_TRACK_GIT_VERSION:
-    print >> sys.stderr, (
+    print((
         'This tool will not show all tracking information for git version '
         'earlier than ' +
         '.'.join(str(x) for x in MIN_UPSTREAM_TRACK_GIT_VERSION) +
-        '. Please consider upgrading.')
+        '. Please consider upgrading.'), file=sys.stderr)
 
   if '-h' in argv:
     print_desc()
@@ -325,7 +325,7 @@ def main(argv):
   mapper.maxjobs = opts.maxjobs
   mapper.show_subject = opts.show_subject
   mapper.start()
-  print mapper.output.as_formatted_string()
+  print(mapper.output.as_formatted_string())
   return 0
 
 if __name__ == '__main__':

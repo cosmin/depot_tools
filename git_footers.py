@@ -84,7 +84,7 @@ def split_footers(message):
     footer_lines = []
 
   footer_lines.reverse()
-  footers = filter(None, map(parse_footer, footer_lines))
+  footers = [_f for _f in map(parse_footer, footer_lines) if _f]
   if not footers:
     return message_lines, [], []
   if maybe_footer_lines:
@@ -229,23 +229,23 @@ def main(args):
 
   if opts.key:
     for v in footers.get(normalize_name(opts.key), []):
-      print v
+      print(v)
   elif opts.position:
     pos = get_position(footers)
-    print '%s@{#%s}' % (pos[0], pos[1] or '?')
+    print('%s@{#%s}' % (pos[0], pos[1] or '?'))
   elif opts.position_ref:
-    print get_position(footers)[0]
+    print(get_position(footers)[0])
   elif opts.position_num:
     pos = get_position(footers)
     assert pos[1], 'No valid position for commit'
-    print pos[1]
+    print(pos[1])
   elif opts.json:
     with open(opts.json, 'w') as f:
       json.dump(footers, f)
   else:
-    for k in footers.keys():
+    for k in list(footers.keys()):
       for v in footers[k]:
-        print '%s: %s' % (k, v)
+        print('%s: %s' % (k, v))
   return 0
 
 

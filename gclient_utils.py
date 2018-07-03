@@ -7,14 +7,14 @@
 import codecs
 import collections
 import contextlib
-import cStringIO
+import io
 import datetime
 import logging
 import operator
 import os
 import pipes
 import platform
-import Queue
+import queue
 import re
 import stat
 import subprocess
@@ -22,9 +22,10 @@ import sys
 import tempfile
 import threading
 import time
-import urlparse
+import urllib.parse
 
 import subprocess2
+from functools import reduce
 
 
 RETRY_MAX = 3
@@ -61,9 +62,9 @@ def Elapsed(until=None):
 def PrintWarnings():
   """Prints any accumulated warnings."""
   if _WARNINGS:
-    print >> sys.stderr, '\n\nWarnings:'
+    print('\n\nWarnings:', file=sys.stderr)
     for warning in _WARNINGS:
-      print >> sys.stderr, warning
+      print(warning, file=sys.stderr)
 
 
 def AddWarning(msg):
@@ -225,12 +226,12 @@ def rmtree(path):
   if sys.platform == 'win32':
     # Give up and use cmd.exe's rd command.
     path = os.path.normcase(path)
-    for _ in xrange(3):
+    for _ in range(3):
       exitcode = subprocess.call(['cmd.exe', '/c', 'rd', '/q', '/s', path])
       if exitcode == 0:
         return
       else:
-        print >> sys.stderr, 'rd exited with code %d' % exitcode
+        print('rd exited with code %d' % exitcode, file=sys.stderr)
       time.sleep(3)
     raise Exception('Failed to remove path %s' % path)
 
@@ -268,7 +269,7 @@ def safe_makedirs(tree):
     count += 1
     try:
       os.makedirs(tree)
-    except OSError, e:
+    except OSError as e:
       # 17 POSIX, 183 Windows
       if e.errno not in (17, 183):
         raise
@@ -416,7 +417,7 @@ class Annotated(Wrapper):
     try:
       # Detect threads no longer existing.
       indexes = (getattr(t, 'index', None) for t in threading.enumerate())
-      indexes = filter(None, indexes)
+      indexes = [_f for _f in indexes if _f]
       for index in self.__output_buffers:
         if not index in indexes:
           orphans.append((index, self.__output_buffers[index][0]))
@@ -491,9 +492,9 @@ class GClientChildren(object):
 
     with GCLIENT_CHILDREN_LOCK:
       if GCLIENT_CHILDREN:
-        print >> sys.stderr, 'Could not kill the following subprocesses:'
+        print('Could not kill the following subprocesses:', file=sys.stderr)
         for zombie in GCLIENT_CHILDREN:
-          print >> sys.stderr, '  ', zombie.pid
+          print('  ', zombie.pid, file=sys.stderr)
 
 
 def CheckCallAndFilter(args, stdout=None, filter_fn=None,
@@ -514,12 +515,12 @@ def CheckCallAndFilter(args, stdout=None, filter_fn=None,
   """
   assert print_stdout or filter_fn
   stdout = stdout or sys.stdout
-  output = cStringIO.StringIO()
+  output = io.StringIO()
   filter_fn = filter_fn or (lambda x: None)
 
   sleep_interval = RETRY_INITIAL_SLEEP
   run_cwd = kwargs.get('cwd', os.getcwd())
-  for _ in xrange(RETRY_MAX + 1):
+  for _ in range(RETRY_MAX + 1):
     kid = subprocess2.Popen(
         args, bufsize=0, stdout=subprocess2.PIPE, stderr=subprocess2.STDOUT,
         **kwargs)
@@ -561,15 +562,15 @@ def CheckCallAndFilter(args, stdout=None, filter_fn=None,
       GClientChildren.remove(kid)
 
     except KeyboardInterrupt:
-      print >> sys.stderr, 'Failed while running "%s"' % ' '.join(args)
+      print('Failed while running "%s"' % ' '.join(args), file=sys.stderr)
       raise
 
     if rv == 0:
       return output.getvalue()
     if not retry:
       break
-    print ("WARNING: subprocess '%s' in %s failed; will retry after a short "
-           'nap...' % (' '.join('"%s"' % x for x in args), run_cwd))
+    print(("WARNING: subprocess '%s' in %s failed; will retry after a short "
+           'nap...' % (' '.join('"%s"' % x for x in args), run_cwd)))
     time.sleep(sleep_interval)
     sleep_interval *= 2
   raise subprocess2.CalledProcessError(
@@ -602,7 +603,7 @@ class GitFilter(object):
 
   def __call__(self, line):
     # git uses an escape sequence to clear the line; elide it.
-    esc = line.find(unichr(033))
+    esc = line.find(chr(0o33))
     if esc > -1:
       line = line[:esc]
     if self.predicate and not self.predicate(line):
@@ -616,7 +617,7 @@ class GitFilter(object):
         return
     self.last_time = now
     self.out_fh.write('[%s] ' % Elapsed())
-    print >> self.out_fh, line
+    print(line, file=self.out_fh)
 
 
 def FindGclientRoot(from_dir, filename='.gclient'):
@@ -638,16 +639,16 @@ def FindGclientRoot(from_dir, filename='.gclient'):
       # might have failed. In that case, we cannot verify that the .gclient
       # is the one we want to use. In order to not to cause too much trouble,
       # just issue a warning and return the path anyway.
-      print >> sys.stderr, ("%s missing, %s file in parent directory %s might "
+      print(("%s missing, %s file in parent directory %s might "
           "not be the file you want to use." %
-          (entries_filename, filename, path))
+          (entries_filename, filename, path)), file=sys.stderr)
       return path
     scope = {}
     try:
       exec(FileRead(entries_filename), scope)
-    except SyntaxError, e:
+    except SyntaxError as e:
       SyntaxErrorToError(filename, e)
-    all_directories = scope['entries'].keys()
+    all_directories = list(scope['entries'].keys())
     path_to_check = real_from_dir[len(path)+1:]
     while path_to_check:
       if path_to_check in all_directories:
@@ -777,7 +778,7 @@ def GetGClientPrimarySolutionName(gclient_root_dir_path):
   """Returns the name of the primary solution in the .gclient file specified."""
   gclient_config_file = os.path.join(gclient_root_dir_path, '.gclient')
   env = {}
-  execfile(gclient_config_file, env)
+  exec(compile(open(gclient_config_file).read(), gclient_config_file, 'exec'), env)
   solutions = env.get('solutions', [])
   if solutions:
     return solutions[0].get('name')
@@ -789,11 +790,11 @@ def GetGClientRootAndEntries(path=None):
   config_file = '.gclient_entries'
   root = FindFileUpwards(config_file, path)
   if not root:
-    print "Can't find %s" % config_file
+    print("Can't find %s" % config_file)
     return None
   config_path = os.path.join(root, config_file)
   env = {}
-  execfile(config_path, env)
+  exec(compile(open(config_path).read(), config_path, 'exec'), env)
   config_dir = os.path.dirname(config_path)
   return config_dir, env['entries']
 
@@ -805,7 +806,7 @@ def lockedmethod(method):
       try:
         self.lock.acquire()
       except KeyboardInterrupt:
-        print >> sys.stderr, 'Was deadlocked'
+        print('Was deadlocked', file=sys.stderr)
         raise
       return method(self, *args, **kwargs)
     finally:
@@ -823,7 +824,7 @@ class WorkItem(object):
   def __init__(self, name):
     # A unique string representing this work item.
     self._name = name
-    self.outbuf = cStringIO.StringIO()
+    self.outbuf = io.StringIO()
     self.start = self.finish = None
     self.resources = []  # List of resources this work item requires.
 
@@ -860,7 +861,7 @@ class ExecutionQueue(object):
     # List of items currently running.
     self.running = []
     # Exceptions thrown if any.
-    self.exceptions = Queue.Queue()
+    self.exceptions = queue.Queue()
     # Progress status
     self.progress = progress
     if self.progress:
@@ -938,7 +939,7 @@ class ExecutionQueue(object):
             break
 
           # Check for new tasks to start.
-          for i in xrange(len(self.queued)):
+          for i in range(len(self.queued)):
             # Verify its requirements.
             if (self.ignore_requirements or
                 not (set(self.queued[i].requirements) - set(self.ran))):
@@ -962,28 +963,28 @@ class ExecutionQueue(object):
           if (now - self.last_join > datetime.timedelta(seconds=60) and
               self.last_subproc_output > self.last_join):
             if self.progress:
-              print >> sys.stdout, ''
+              print('', file=sys.stdout)
               sys.stdout.flush()
             elapsed = Elapsed()
-            print >> sys.stdout, '[%s] Still working on:' % elapsed
+            print('[%s] Still working on:' % elapsed, file=sys.stdout)
             sys.stdout.flush()
             for task in self.running:
-              print >> sys.stdout, '[%s]   %s' % (elapsed, task.item.name)
+              print('[%s]   %s' % (elapsed, task.item.name), file=sys.stdout)
               sys.stdout.flush()
         except KeyboardInterrupt:
           # Help debugging by printing some information:
-          print >> sys.stderr, (
+          print((
               ('\nAllowed parallel jobs: %d\n# queued: %d\nRan: %s\n'
                 'Running: %d') % (
               self.jobs,
               len(self.queued),
               ', '.join(self.ran),
-              len(self.running)))
+              len(self.running))), file=sys.stderr)
           for i in self.queued:
-            print >> sys.stderr, '%s (not started): %s' % (
-                i.name, ', '.join(i.requirements))
+            print('%s (not started): %s' % (
+                i.name, ', '.join(i.requirements)), file=sys.stderr)
           for i in self.running:
-            print >> sys.stderr, self.format_task_output(i.item, 'interrupted')
+            print(self.format_task_output(i.item, 'interrupted'), file=sys.stderr)
           raise
         # Something happened: self.enqueue() or a thread terminated. Loop again.
     finally:
@@ -992,12 +993,12 @@ class ExecutionQueue(object):
     assert not self.running, 'Now guaranteed to be single-threaded'
     if not self.exceptions.empty():
       if self.progress:
-        print >> sys.stdout, ''
+        print('', file=sys.stdout)
       # To get back the stack location correctly, the raise a, b, c form must be
       # used, passing a tuple as the first argument doesn't work.
       e, task = self.exceptions.get()
-      print >> sys.stderr, self.format_task_output(task.item, 'ERROR')
-      raise e[0], e[1], e[2]
+      print(self.format_task_output(task.item, 'ERROR'), file=sys.stderr)
+      raise e[0](e[1]).with_traceback(e[2])
     elif self.progress:
       self.progress.end()
 
@@ -1013,7 +1014,7 @@ class ExecutionQueue(object):
         self.last_join = datetime.datetime.now()
         sys.stdout.flush()
         if self.verbose:
-          print >> sys.stdout, self.format_task_output(t.item)
+          print(self.format_task_output(t.item), file=sys.stdout)
         if self.progress:
           self.progress.update(1, t.item.name)
         if t.item.name in self.ran:
@@ -1035,22 +1036,22 @@ class ExecutionQueue(object):
       # exception.
       try:
         task_item.start = datetime.datetime.now()
-        print >> task_item.outbuf, '[%s] Started.' % Elapsed(task_item.start)
+        print('[%s] Started.' % Elapsed(task_item.start), file=task_item.outbuf)
         task_item.run(*args, **kwargs)
         task_item.finish = datetime.datetime.now()
-        print >> task_item.outbuf, '[%s] Finished.' % Elapsed(task_item.finish)
+        print('[%s] Finished.' % Elapsed(task_item.finish), file=task_item.outbuf)
         self.ran.append(task_item.name)
         if self.verbose:
           if self.progress:
-            print >> sys.stdout, ''
-          print >> sys.stdout, self.format_task_output(task_item)
+            print('', file=sys.stdout)
+          print(self.format_task_output(task_item), file=sys.stdout)
         if self.progress:
           self.progress.update(1, ', '.join(t.item.name for t in self.running))
       except KeyboardInterrupt:
-        print >> sys.stderr, self.format_task_output(task_item, 'interrupted')
+        print(self.format_task_output(task_item, 'interrupted'), file=sys.stderr)
         raise
       except Exception:
-        print >> sys.stderr, self.format_task_output(task_item, 'ERROR')
+        print(self.format_task_output(task_item, 'ERROR'), file=sys.stderr)
         raise
 
 
@@ -1071,10 +1072,10 @@ class ExecutionQueue(object):
       work_queue = self.kwargs['work_queue']
       try:
         self.item.start = datetime.datetime.now()
-        print >> self.item.outbuf, '[%s] Started.' % Elapsed(self.item.start)
+        print('[%s] Started.' % Elapsed(self.item.start), file=self.item.outbuf)
         self.item.run(*self.args, **self.kwargs)
         self.item.finish = datetime.datetime.now()
-        print >> self.item.outbuf, '[%s] Finished.' % Elapsed(self.item.finish)
+        print('[%s] Finished.' % Elapsed(self.item.finish), file=self.item.outbuf)
       except KeyboardInterrupt:
         logging.info('Caught KeyboardInterrupt in thread %s', self.item.name)
         logging.info(str(sys.exc_info()))
@@ -1125,8 +1126,8 @@ def RunEditor(content, git, git_editor=None):
   file_handle, filename = tempfile.mkstemp(text=True, prefix='cl_description')
   # Make sure CRLF is handled properly by requiring none.
   if '\r' in content:
-    print >> sys.stderr, (
-        '!! Please remove \\r from your change description !!')
+    print((
+        '!! Please remove \\r from your change description !!'), file=sys.stderr)
   fileobj = os.fdopen(file_handle, 'w')
   # Still remove \r if present.
   content = re.sub('\r?\n', '\n', content)
@@ -1169,11 +1170,11 @@ def UpgradeToHttps(url):
     # relative url and will use http:///foo. Note that it defaults to http://
     # for compatibility with naked url like "localhost:8080".
     url = 'http://%s' % url
-  parsed = list(urlparse.urlparse(url))
+  parsed = list(urllib.parse.urlparse(url))
   # Do not automatically upgrade http to https if a port number is provided.
   if parsed[0] == 'http' and not re.match(r'^.+?\:\d+$', parsed[1]):
     parsed[0] = 'https'
-  return urlparse.urlunparse(parsed)
+  return urllib.parse.urlunparse(parsed)
 
 
 def ParseCodereviewSettingsContent(content):
@@ -1279,7 +1280,7 @@ def freeze(obj):
   Will raise TypeError if you pass an object which is not hashable.
   """
   if isinstance(obj, collections.Mapping):
-    return FrozenDict((freeze(k), freeze(v)) for k, v in obj.iteritems())
+    return FrozenDict((freeze(k), freeze(v)) for k, v in obj.items())
   elif isinstance(obj, (list, tuple)):
     return tuple(freeze(i) for i in obj)
   elif isinstance(obj, set):
@@ -1300,7 +1301,7 @@ class FrozenDict(collections.Mapping):
     # Calculate the hash immediately so that we know all the items are
     # hashable too.
     self._hash = reduce(operator.xor,
-                        (hash(i) for i in enumerate(self._d.iteritems())), 0)
+                        (hash(i) for i in enumerate(self._d.items())), 0)
 
   def __eq__(self, other):
     if not isinstance(other, collections.Mapping):
@@ -1309,7 +1310,7 @@ class FrozenDict(collections.Mapping):
       return True
     if len(self) != len(other):
       return False
-    for k, v in self.iteritems():
+    for k, v in self.items():
       if k not in other or other[k] != v:
         return False
     return True
@@ -1327,4 +1328,4 @@ class FrozenDict(collections.Mapping):
     return self._hash
 
   def __repr__(self):
-    return 'FrozenDict(%r)' % (self._d.items(),)
+    return 'FrozenDict(%r)' % (list(self._d.items()),)

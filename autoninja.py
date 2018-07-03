@@ -86,4 +86,4 @@ if not t_specified:
   args.append('-l')
   args.append('%d' % num_cores)
 
-print ' '.join(args)
+print(' '.join(args))

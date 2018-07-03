@@ -157,7 +157,7 @@ def gen_commit_msg(logs, cmdline, rolls, reviewers, bug):
 def finalize(commit_msg, deps_path, deps_content, rolls, is_relative, root_dir):
   """Edits the DEPS file, commits it, then uploads a CL."""
   print('Commit message:')
-  print('\n'.join('    ' + i for i in commit_msg.splitlines()))
+  print(('\n'.join('    ' + i for i in commit_msg.splitlines())))
 
   with open(deps_path, 'wb') as f:
     f.write(deps_content)
@@ -167,7 +167,7 @@ def finalize(commit_msg, deps_path, deps_content, rolls, is_relative, root_dir):
 
   # Pull the dependency to the right revision. This is surprising to users
   # otherwise.
-  for dependency, (_head, roll_to) in sorted(rolls.iteritems()):
+  for dependency, (_head, roll_to) in sorted(rolls.items()):
     full_dir = os.path.normpath(os.path.join(root_dir, dependency))
     check_call(['git', 'checkout', '--quiet', roll_to], cwd=full_dir)
 
@@ -238,14 +238,14 @@ def main():
       if roll_to == head:
         if len(dependencies) == 1:
           raise AlreadyRolledError('No revision to roll!')
-        print('%s: Already at latest commit %s' % (dependency, roll_to))
+        print(('%s: Already at latest commit %s' % (dependency, roll_to)))
       else:
-        print(
-            '%s: Rolling from %s to %s' % (dependency, head[:10], roll_to[:10]))
+        print((
+            '%s: Rolling from %s to %s' % (dependency, head[:10], roll_to[:10])))
         rolls[dependency] = (head, roll_to)
 
     logs = []
-    for dependency, (head, roll_to) in sorted(rolls.iteritems()):
+    for dependency, (head, roll_to) in sorted(rolls.items()):
       full_dir = os.path.normpath(os.path.join(root_dir, dependency))
       log = generate_commit_message(
           full_dir, dependency, head, roll_to, args.no_log, args.log_limit)

@@ -5,7 +5,7 @@
 
 """A git command for managing a local cache of git repositories."""
 
-from __future__ import print_function
+
 import contextlib
 import errno
 import logging
@@ -17,7 +17,7 @@ import threading
 import time
 import subprocess
 import sys
-import urlparse
+import urllib.parse
 import zipfile
 
 from download_from_google_storage import Gsutil
@@ -65,7 +65,7 @@ def exponential_backoff_retry(fn, excs=(Exception,), name=None, count=10,
   Returns: The return value of the successful fn.
   """
   printerr = printerr or logging.warning
-  for i in xrange(count):
+  for i in range(count):
     try:
       return fn()
     except excs as e:
@@ -239,7 +239,7 @@ class Mirror(object):
 
   @property
   def bootstrap_bucket(self):
-    u = urlparse.urlparse(self.url)
+    u = urllib.parse.urlparse(self.url)
     if u.netloc == 'chromium.googlesource.com':
       return 'chromium-git-cache'
     elif u.netloc == 'chrome-internal.googlesource.com':
@@ -254,7 +254,7 @@ class Mirror(object):
   @staticmethod
   def UrlToCacheDir(url):
     """Convert a git url to a normalized form for the cache dir path."""
-    parsed = urlparse.urlparse(url)
+    parsed = urllib.parse.urlparse(url)
     norm_url = parsed.netloc + parsed.path
     if norm_url.endswith('.git'):
       norm_url = norm_url[:-len('.git')]
@@ -441,7 +441,7 @@ class Mirror(object):
 
   def supported_project(self):
     """Returns true if this repo is known to have a bootstrap zip file."""
-    u = urlparse.urlparse(self.url)
+    u = urllib.parse.urlparse(self.url)
     return u.netloc in [
         'chromium.googlesource.com',
         'chrome-internal.googlesource.com']

@@ -9,15 +9,15 @@ Example usage:
   ./gerrit_client.py [command] [args]""
 """
 
-from __future__ import print_function
+
 
 import json
 import logging
 import optparse
 import subcommand
 import sys
-import urllib
-import urlparse
+import urllib.request, urllib.parse, urllib.error
+import urllib.parse
 
 from third_party import colorama
 import fix_encoding
@@ -40,9 +40,9 @@ def CMDbranchinfo(parser, args):
   parser.add_option('--branch', dest='branch', help='branch name')
 
   (opt, args) = parser.parse_args(args)
-  host = urlparse.urlparse(opt.host).netloc
-  project = urllib.quote_plus(opt.project)
-  branch = urllib.quote_plus(opt.branch)
+  host = urllib.parse.urlparse(opt.host).netloc
+  project = urllib.parse.quote_plus(opt.project)
+  branch = urllib.parse.quote_plus(opt.branch)
   result = gerrit_util.GetGerritBranch(host, project, branch)
   logging.info(result)
   write_result(result, opt)
@@ -54,10 +54,10 @@ def CMDbranch(parser, args):
 
   (opt, args) = parser.parse_args(args)
 
-  project = urllib.quote_plus(opt.project)
-  host = urlparse.urlparse(opt.host).netloc
-  branch = urllib.quote_plus(opt.branch)
-  commit = urllib.quote_plus(opt.commit)
+  project = urllib.parse.quote_plus(opt.project)
+  host = urllib.parse.urlparse(opt.host).netloc
+  branch = urllib.parse.quote_plus(opt.branch)
+  commit = urllib.parse.quote_plus(opt.commit)
   result = gerrit_util.CreateGerritBranch(host, project, branch, commit)
   logging.info(result)
   write_result(result, opt)
@@ -78,7 +78,7 @@ def CMDchanges(parser, args):
   (opt, args) = parser.parse_args(args)
 
   result = gerrit_util.QueryChanges(
-      urlparse.urlparse(opt.host).netloc,
+      urllib.parse.urlparse(opt.host).netloc,
       list(tuple(p.split('=', 1)) for p in opt.params),
       start=opt.start,        # Default: None
       limit=opt.limit,        # Default: None
