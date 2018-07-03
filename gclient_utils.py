@@ -137,14 +137,8 @@ class PrintableObject(object):
 
 
 def FileRead(filename, mode='rU'):
-  with open(filename, mode=mode) as f:
-    # codecs.open() has different behavior than open() on python 2.6 so use
-    # open() and decode manually.
-    s = f.read()
-    try:
-      return s.decode('utf-8')
-    except UnicodeDecodeError:
-      return s
+  with open(filename, mode=mode, encoding='utf-8') as f:
+    return f.read()
 
 
 def FileWrite(filename, content, mode='w'):
@@ -523,6 +517,7 @@ def CheckCallAndFilter(args, stdout=None, filter_fn=None,
   for _ in range(RETRY_MAX + 1):
     kid = subprocess2.Popen(
         args, bufsize=0, stdout=subprocess2.PIPE, stderr=subprocess2.STDOUT,
+        encoding='utf-8', universal_newlines=True,
         **kwargs)
 
     GClientChildren.add(kid)

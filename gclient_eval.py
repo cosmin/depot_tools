@@ -244,7 +244,8 @@ def _gclient_eval(node_or_string, filename='<unknown>', vars_dict=None):
         raise ValueError(
             'Var is the only allowed function (file %r, line %s)' % (
                 filename, getattr(node, 'lineno', '<unknown>')))
-      if node.keywords or node.starargs or node.kwargs or len(node.args) != 1:
+      starargs = [a for a in node.args if type(a) is ast.Starred]
+      if node.keywords or starargs or len(node.args) != 1:
         raise ValueError(
             'Var takes exactly one argument (file %r, line %s)' % (
                 filename, getattr(node, 'lineno', '<unknown>')))

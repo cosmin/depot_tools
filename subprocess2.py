@@ -481,7 +481,7 @@ def check_call_out(args, **kwargs):
 
   Returns (stdout, stderr), unlike subprocess.check_call().
   """
-  out, returncode = communicate(args, **kwargs)
+  out, returncode = communicate(args, encoding='utf-8', **kwargs)
   if returncode:
     raise CalledProcessError(
         returncode, args, kwargs.get('cwd'), out[0], out[1])
