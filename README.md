@@ -1,6 +1,10 @@
 # depot_tools
 
-Tools for working with Chromium development. It requires python 2.7.
+A fork of the Chromium's project `depot_tools`, for the purpose of
+adding Python 3 support, starting by running `2to3` on the codebase
+and applying additional fixes as necessary.
+
+It requires Python 3.6 or newer.
 
 
 ## Tools
